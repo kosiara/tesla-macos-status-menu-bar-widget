@@ -14,6 +14,7 @@ _server: HTTPServer | None = None
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         global _callback_result
+        logger.info("OAuth: path received: " + self.path)
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
@@ -21,6 +22,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         state = params.get("state", [None])[0]
         error = params.get("error", [None])[0]
 
+        logger.info("OAuth: code=%s, state=%s, error=%s", code, state, error)
         if error:
             _callback_result = {"error": error}
         elif code:
