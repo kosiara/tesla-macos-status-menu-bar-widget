@@ -420,7 +420,8 @@ class TeslaBarTray:
             logger.info("OAuth authentication successful")
 
             # One-time partner registration (needed for Fleet API access)
-            await self._tesla.register_partner()
+            domain = load_config().get("github_pages_domain", "")
+            await self._tesla.register_partner(domain)
 
             # Discover vehicle
             await self._tesla.discover_vehicle()

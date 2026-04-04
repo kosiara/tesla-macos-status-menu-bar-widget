@@ -81,10 +81,11 @@ def main() -> None:
     )
 
     # If we have tokens, try to discover vehicle immediately
+    domain = cfg.get("github_pages_domain", "")
     async def _startup_discover():
         try:
             if tesla.is_authenticated and not tesla.token_expired:
-                await tesla.register_partner()
+                await tesla.register_partner(domain)
                 await tesla.discover_vehicle()
             elif tesla.is_authenticated and tesla._refresh_token:
                 success = await tesla.refresh_access_token()
@@ -99,7 +100,7 @@ def main() -> None:
                         stored = dict(creds)
                     stored.update(tesla.get_tokens())
                     _save(stored, password)
-                    await tesla.register_partner()
+                    await tesla.register_partner(domain)
                     await tesla.discover_vehicle()
         except Exception as e:
             logger.error("Startup discovery failed: %s", e)
