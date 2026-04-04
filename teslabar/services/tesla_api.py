@@ -1,0 +1,453 @@
+"""Tesla Fleet API service layer wrapping python-tesla-fleet-api."""
+
+import asyncio
+import logging
+import time
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
+import aiohttp
+from tesla_fleet_api.tesla.fleet import TeslaFleetApi
+from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
+
+logger = logging.getLogger(__name__)
+
+
+class VehicleState(Enum):
+    UNKNOWN = "unknown"
+    ONLINE = "online"
+    ASLEEP = "asleep"
+    OFFLINE = "offline"
+    WAKING = "waking"
+    ERROR = "error"
+    AUTH_EXPIRED = "auth_expired"
+
+
+@dataclass
+class VehicleData:
+    state: VehicleState = VehicleState.UNKNOWN
+    battery_level: int = 0
+    charge_limit: int = 80
+    charging_state: str = "Disconnected"
+    is_locked: bool = True
+    sentry_mode: bool = False
+    climate_on: bool = False
+    inside_temp: float | None = None
+    outside_temp: float | None = None
+    error_message: str = ""
+    last_updated: float = 0.0
+
+
+@dataclass
+class ScheduleEntry:
+    id: int = 0
+    name: str = ""
+    days_of_week: int = 0
+    enabled: bool = True
+    latitude: float = 0.0
+    longitude: float = 0.0
+    time_minutes: int = 0  # minutes after midnight
+
+    @property
+    def time_str(self) -> str:
+        h, m = divmod(self.time_minutes, 60)
+        return f"{h:02d}:{m:02d}"
+
+    @property
+    def days_list(self) -> list[str]:
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        return [days[i] for i in range(7) if self.days_of_week & (1 << i)]
+
+
+class TeslaService:
+    def __init__(self) -> None:
+        self._api: TeslaFleetApi | None = None
+        self._vehicle: VehicleFleet | None = None
+        self._session: aiohttp.ClientSession | None = None
+        self._vin: str | None = None
+        self._access_token: str = ""
+        self._refresh_token: str = ""
+        self._token_expiry: float = 0.0
+        self._client_id: str = ""
+        self._client_secret: str = ""
+        self._region: str = "eu"  # default, will be auto-detected
+        self.vehicle_data = VehicleData()
+        self._command_status: str = ""
+        self._reauth_callback = None
+
+    @property
+    def command_status(self) -> str:
+        return self._command_status
+
+    @property
+    def is_authenticated(self) -> bool:
+        return bool(self._access_token)
+
+    @property
+    def token_expired(self) -> bool:
+        return time.time() >= self._token_expiry if self._token_expiry else True
+
+    def configure(
+        self,
+        client_id: str,
+        client_secret: str,
+        access_token: str = "",
+        refresh_token: str = "",
+        token_expiry: float = 0.0,
+        region: str = "eu",
+    ) -> None:
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._access_token = access_token
+        self._refresh_token = refresh_token
+        self._token_expiry = token_expiry
+        self._region = region
+
+    def get_tokens(self) -> dict:
+        return {
+            "access_token": self._access_token,
+            "refresh_token": self._refresh_token,
+            "token_expiry": self._token_expiry,
+        }
+
+    def get_oauth_url(self, redirect_uri: str, state: str) -> str:
+        scopes = [
+            "openid",
+            "offline_access",
+            "vehicle_device_data",
+            "vehicle_cmds",
+            "vehicle_charging_cmds",
+        ]
+        scope_str = "%20".join(scopes)
+        return (
+            f"https://auth.tesla.com/oauth2/v3/authorize"
+            f"?client_id={self._client_id}"
+            f"&redirect_uri={redirect_uri}"
+            f"&response_type=code"
+            f"&scope={scope_str}"
+            f"&state={state}"
+        )
+
+    async def exchange_code(self, code: str, redirect_uri: str) -> dict:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "https://auth.tesla.com/oauth2/v3/token",
+                json={
+                    "grant_type": "authorization_code",
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                },
+            ) as resp:
+                data = await resp.json()
+                if "access_token" not in data:
+                    raise RuntimeError(f"Token exchange failed: {data}")
+                self._access_token = data["access_token"]
+                self._refresh_token = data.get("refresh_token", "")
+                expires_in = data.get("expires_in", 28800)
+                self._token_expiry = time.time() + expires_in
+                # Reset API so it picks up new token
+                self._api = None
+                self._vehicle = None
+                return data
+
+    async def refresh_access_token(self) -> bool:
+        if not self._refresh_token:
+            return False
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://auth.tesla.com/oauth2/v3/token",
+                    json={
+                        "grant_type": "refresh_token",
+                        "client_id": self._client_id,
+                        "client_secret": self._client_secret,
+                        "refresh_token": self._refresh_token,
+                    },
+                ) as resp:
+                    data = await resp.json()
+                    if "access_token" not in data:
+                        logger.error("Token refresh failed: %s", data)
+                        return False
+                    self._access_token = data["access_token"]
+                    if "refresh_token" in data:
+                        self._refresh_token = data["refresh_token"]
+                    expires_in = data.get("expires_in", 28800)
+                    self._token_expiry = time.time() + expires_in
+                    # Reset API so it picks up new token
+                    self._api = None
+                    self._vehicle = None
+                    return True
+        except Exception as e:
+            logger.error("Token refresh error: %s", e)
+            return False
+
+    async def _ensure_api(self) -> TeslaFleetApi:
+        if self.token_expired and self._refresh_token:
+            success = await self.refresh_access_token()
+            if not success:
+                self.vehicle_data.state = VehicleState.AUTH_EXPIRED
+                raise RuntimeError("Authentication expired. Please re-authenticate.")
+
+        if self._api is None:
+            if self._session is not None:
+                await self._session.close()
+            self._session = aiohttp.ClientSession()
+            self._api = TeslaFleetApi(
+                session=self._session,
+                access_token=self._access_token,
+                region=self._region,
+            )
+        return self._api
+
+    async def _ensure_vehicle(self) -> VehicleFleet:
+        if self._vehicle is not None:
+            return self._vehicle
+        api = await self._ensure_api()
+        if not self._vin:
+            await self.discover_vehicle()
+        if self._vin:
+            self._vehicle = api.vehicles.createFleet(self._vin)
+        if self._vehicle is None:
+            raise RuntimeError("No vehicle available")
+        return self._vehicle
+
+    async def discover_vehicle(self) -> bool:
+        try:
+            api = await self._ensure_api()
+            # Use products endpoint to find vehicles
+            resp = await api.products()
+            vehicles = [
+                p for p in resp.get("response", [])
+                if "vin" in p
+            ]
+            if not vehicles:
+                self.vehicle_data.state = VehicleState.ERROR
+                self.vehicle_data.error_message = "No vehicles found on account"
+                return False
+            v = vehicles[0]
+            self._vin = v.get("vin")
+            self._vehicle = api.vehicles.createFleet(self._vin)
+            logger.info("Discovered vehicle: %s", self._vin)
+            return True
+        except Exception as e:
+            logger.error("Vehicle discovery failed: %s", e)
+            self.vehicle_data.state = VehicleState.ERROR
+            self.vehicle_data.error_message = str(e)
+            return False
+
+    async def _wake_if_needed(self) -> bool:
+        if self.vehicle_data.state in (VehicleState.ASLEEP, VehicleState.OFFLINE):
+            self.vehicle_data.state = VehicleState.WAKING
+            self._command_status = "Waking vehicle..."
+            try:
+                vehicle = await self._ensure_vehicle()
+                await vehicle.wake_up()
+                for _ in range(30):
+                    await asyncio.sleep(2)
+                    resp = await vehicle.vehicle()
+                    state = resp.get("response", {}).get("state", "")
+                    if state == "online":
+                        self.vehicle_data.state = VehicleState.ONLINE
+                        return True
+                self.vehicle_data.state = VehicleState.ERROR
+                self.vehicle_data.error_message = "Vehicle did not wake up"
+                return False
+            except Exception as e:
+                logger.error("Wake failed: %s", e)
+                self.vehicle_data.state = VehicleState.ERROR
+                self.vehicle_data.error_message = str(e)
+                return False
+        return True
+
+    async def fetch_vehicle_data(self) -> VehicleData:
+        try:
+            vehicle = await self._ensure_vehicle()
+
+            try:
+                resp = await vehicle.vehicle_data(
+                    endpoints=[
+                        "charge_state",
+                        "climate_state",
+                        "vehicle_state",
+                    ],
+                )
+            except Exception as e:
+                err_str = str(e).lower()
+                if "408" in err_str or "asleep" in err_str or "offline" in err_str:
+                    self.vehicle_data.state = VehicleState.ASLEEP
+                    return self.vehicle_data
+                raise
+
+            data = resp.get("response", {})
+            state_str = data.get("state", "unknown")
+
+            if state_str == "asleep":
+                self.vehicle_data.state = VehicleState.ASLEEP
+                return self.vehicle_data
+            if state_str == "offline":
+                self.vehicle_data.state = VehicleState.OFFLINE
+                return self.vehicle_data
+
+            charge = data.get("charge_state", {})
+            climate = data.get("climate_state", {})
+            vstate = data.get("vehicle_state", {})
+
+            self.vehicle_data = VehicleData(
+                state=VehicleState.ONLINE,
+                battery_level=charge.get("battery_level", 0),
+                charge_limit=charge.get("charge_limit_soc", 80),
+                charging_state=charge.get("charging_state", "Disconnected"),
+                is_locked=vstate.get("locked", True),
+                sentry_mode=vstate.get("sentry_mode", False),
+                climate_on=climate.get("is_climate_on", False),
+                inside_temp=climate.get("inside_temp"),
+                outside_temp=climate.get("outside_temp"),
+                last_updated=time.time(),
+            )
+            self._command_status = ""
+            return self.vehicle_data
+
+        except RuntimeError:
+            raise
+        except Exception as e:
+            logger.error("Fetch vehicle data error: %s", e)
+            self.vehicle_data.state = VehicleState.ERROR
+            self.vehicle_data.error_message = str(e)
+            return self.vehicle_data
+
+    async def _send_command(self, command: str, **kwargs: Any) -> bool:
+        try:
+            self._command_status = f"Executing: {command}..."
+            vehicle = await self._ensure_vehicle()
+
+            if not await self._wake_if_needed():
+                self._command_status = "Failed: vehicle not reachable"
+                return False
+
+            cmd_func = getattr(vehicle, command, None)
+            if cmd_func is None:
+                self._command_status = f"Unknown command: {command}"
+                return False
+
+            if kwargs:
+                await cmd_func(**kwargs)
+            else:
+                await cmd_func()
+
+            self._command_status = f"Success: {command}"
+            return True
+        except Exception as e:
+            logger.error("Command %s failed: %s", command, e)
+            self._command_status = f"Failed: {e}"
+            self.vehicle_data.state = VehicleState.ERROR
+            self.vehicle_data.error_message = str(e)
+            return False
+
+    async def start_charge(self) -> bool:
+        return await self._send_command("charge_start")
+
+    async def stop_charge(self) -> bool:
+        return await self._send_command("charge_stop")
+
+    async def set_charge_limit(self, percent: int) -> bool:
+        return await self._send_command("set_charge_limit", percent=percent)
+
+    async def climate_on(self) -> bool:
+        return await self._send_command("auto_conditioning_start")
+
+    async def climate_off(self) -> bool:
+        return await self._send_command("auto_conditioning_stop")
+
+    async def lock(self) -> bool:
+        return await self._send_command("door_lock")
+
+    async def unlock(self) -> bool:
+        return await self._send_command("door_unlock")
+
+    async def get_charge_schedules(self) -> list[ScheduleEntry]:
+        try:
+            vehicle = await self._ensure_vehicle()
+            resp = await vehicle.vehicle_data(
+                endpoints=["charge_schedule_data"]
+            )
+            data = resp.get("response", {})
+            schedules_raw = (
+                data.get("charge_schedule_data", {})
+                .get("charge_schedule", [])
+            )
+            entries = []
+            for s in schedules_raw:
+                entries.append(
+                    ScheduleEntry(
+                        id=s.get("id", 0),
+                        name=s.get("name", ""),
+                        days_of_week=s.get("days_of_week", 0),
+                        enabled=s.get("enabled", True),
+                        latitude=s.get("latitude", 0.0),
+                        longitude=s.get("longitude", 0.0),
+                        time_minutes=s.get("start_time", 0),
+                    )
+                )
+            return entries
+        except Exception as e:
+            logger.error("Failed to get charge schedules: %s", e)
+            return []
+
+    async def remove_charge_schedule(self, schedule_id: int) -> bool:
+        return await self._send_command("remove_charge_schedule", id=schedule_id)
+
+    async def get_precondition_schedules(self) -> list[ScheduleEntry]:
+        try:
+            vehicle = await self._ensure_vehicle()
+            resp = await vehicle.vehicle_data(
+                endpoints=["preconditioning_schedule_data"]
+            )
+            data = resp.get("response", {})
+            schedules_raw = (
+                data.get("preconditioning_schedule_data", {})
+                .get("precondition_schedule", [])
+            )
+            entries = []
+            for s in schedules_raw:
+                entries.append(
+                    ScheduleEntry(
+                        id=s.get("id", 0),
+                        name=s.get("name", ""),
+                        days_of_week=s.get("days_of_week", 0),
+                        enabled=s.get("enabled", True),
+                        latitude=s.get("latitude", 0.0),
+                        longitude=s.get("longitude", 0.0),
+                        time_minutes=s.get("precondition_time", 0),
+                    )
+                )
+            return entries
+        except Exception as e:
+            logger.error("Failed to get precondition schedules: %s", e)
+            return []
+
+    async def add_precondition_schedule(
+        self, days_of_week: int, time_minutes: int
+    ) -> bool:
+        return await self._send_command(
+            "add_precondition_schedule",
+            days_of_week=days_of_week,
+            enabled=True,
+            lat=0.0,
+            lon=0.0,
+            precondition_time=time_minutes,
+        )
+
+    async def remove_precondition_schedule(self, schedule_id: int) -> bool:
+        return await self._send_command(
+            "remove_precondition_schedule", id=schedule_id
+        )
+
+    async def close(self) -> None:
+        if self._session:
+            await self._session.close()
+            self._session = None
+            self._api = None
+            self._vehicle = None

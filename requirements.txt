@@ -1,0 +1,6 @@
+PySide6>=6.8
+tesla-fleet-api>=1.0.0
+cryptography>=44.0
+keyring>=25.0
+qrcode[pil]>=8.0
+aiohttp>=3.11
