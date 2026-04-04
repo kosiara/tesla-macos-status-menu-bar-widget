@@ -107,38 +107,67 @@ class TeslaService:
 
     async def register_partner(self, domain: str = "") -> bool:
         """One-time partner registration. Uses a separate session to avoid overwriting user token."""
+        if not domain:
+            logger.warning(
+                "No GitHub Pages domain configured — partner domain registration skipped.\n"
+                "  To fix this:\n"
+                "  1. Open Settings in TeslaBar\n"
+                "  2. Generate a Virtual Key pair (if not done)\n"
+                "  3. Create a GitHub repo with Pages enabled\n"
+                "  4. Host your public key at: https://<your-domain>/.well-known/appspecific/com.tesla.3p.public-key.pem\n"
+                "  5. Enter your GitHub Pages domain (e.g. username.github.io) in Settings\n"
+                "  6. Restart the app"
+            )
+            return False
+
+        # Strip any path — Tesla only accepts the hostname
+        clean_domain = domain.split("/")[0]
+
         try:
             async with aiohttp.ClientSession() as session:
-                partner_api = TeslaFleetApi(
-                    session=session,
-                    access_token=self._access_token,
-                    region=self._region,
-                )
                 # Step 1: Get partner token via client credentials
-                await partner_api.partner_login(self._client_id, self._client_secret)
+                token_resp = await session.post(
+                    "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token",
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": self._client_id,
+                        "client_secret": self._client_secret,
+                        "audience": f"https://fleet-api.prd.{self._region}.vn.cloud.tesla.com",
+                        "scope": "openid",
+                    },
+                )
+                token_data = await token_resp.json()
+                if "access_token" not in token_data:
+                    logger.error("Partner login failed: %s", token_data)
+                    return False
+                partner_token = token_data["access_token"]
                 logger.info("Partner login successful")
 
-                # Step 2: Register domain (required for Fleet API access)
-                if domain:
-                    try:
-                        resp = await partner_api.partner.register(domain)
-                        logger.info("Partner domain registered: %s", resp)
-                    except Exception as e:
-                        logger.warning("Partner domain registration: %s (may already be registered)", e)
+                # Step 2: Register domain with partner token
+                server = f"https://fleet-api.prd.{self._region}.vn.cloud.tesla.com"
+                reg_resp = await session.post(
+                    f"{server}/api/1/partner_accounts",
+                    headers={
+                        "Authorization": f"Bearer {partner_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"domain": clean_domain},
+                )
+                reg_data = await reg_resp.json()
+                if reg_resp.ok:
+                    logger.info("Partner domain registered: %s", reg_data)
                 else:
-                    logger.warning(
-                        "No GitHub Pages domain configured — partner domain registration skipped.\n"
-                        "  To fix this:\n"
-                        "  1. Open Settings in TeslaBar\n"
-                        "  2. Generate a Virtual Key pair (if not done)\n"
-                        "  3. Create a GitHub repo with Pages enabled\n"
-                        "  4. Host your public key at: https://<your-domain>/.well-known/appspecific/com.tesla.3p.public-key.pem\n"
-                        "  5. Enter your GitHub Pages domain (e.g. username.github.io) in Settings\n"
-                        "  6. Restart the app"
+                    logger.error(
+                        "Partner domain registration failed (HTTP %s): %s\n"
+                        "  Domain used: %s\n"
+                        "  Tesla requires the public key at:\n"
+                        "  https://%s/.well-known/appspecific/com.tesla.3p.public-key.pem",
+                        reg_resp.status, reg_data, clean_domain, clean_domain,
                     )
                 return True
         except Exception as e:
-            logger.warning("Partner registration failed: %s", e)
+            logger.error("Partner registration failed: %s", e)
             return False
 
     def get_tokens(self) -> dict:
