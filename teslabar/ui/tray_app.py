@@ -418,6 +418,10 @@ class TeslaBarTray:
 
             self._status_action.setText("Status: Authenticated!")
             logger.info("OAuth authentication successful")
+
+            # One-time partner registration (needed for Fleet API access)
+            await self._tesla.register_partner()
+
             # Discover vehicle
             await self._tesla.discover_vehicle()
             self._update_menu()

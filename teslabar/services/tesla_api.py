@@ -105,6 +105,34 @@ class TeslaService:
         self._token_expiry = token_expiry
         self._region = region
 
+    async def register_partner(self, domain: str = "") -> bool:
+        """One-time partner registration. Uses a separate session to avoid overwriting user token."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                partner_api = TeslaFleetApi(
+                    session=session,
+                    access_token=self._access_token,
+                    region=self._region,
+                )
+                # Step 1: Get partner token via client credentials
+                await partner_api.partner_login(self._client_id, self._client_secret)
+                logger.info("Partner login successful")
+
+                # Step 2: Register domain (required for Fleet API access)
+                if domain:
+                    try:
+                        resp = await partner_api.partner.register(domain)
+                        logger.info("Partner domain registered: %s", resp)
+                    except Exception as e:
+                        logger.warning("Partner domain registration: %s (may already be registered)", e)
+                else:
+                    logger.warning("No domain configured — partner domain registration skipped. "
+                                   "Set your GitHub Pages domain in Settings.")
+                return True
+        except Exception as e:
+            logger.warning("Partner registration: %s", e)
+            return False
+
     def get_tokens(self) -> dict:
         return {
             "access_token": self._access_token,
@@ -201,6 +229,8 @@ class TeslaService:
                 access_token=self._access_token,
                 region=self._region,
             )
+            logger.info("API initialized with region=%s, server=%s", self._region, self._api.server)
+
         return self._api
 
     async def _ensure_vehicle(self) -> VehicleFleet:

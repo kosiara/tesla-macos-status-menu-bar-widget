@@ -81,26 +81,31 @@ def main() -> None:
     )
 
     # If we have tokens, try to discover vehicle immediately
-    if tesla.is_authenticated and not tesla.token_expired:
-        asyncio.ensure_future(tesla.discover_vehicle())
-    elif tesla.is_authenticated and tesla._refresh_token:
-        # Try refresh first
-        async def _try_refresh():
-            success = await tesla.refresh_access_token()
-            if success:
-                # Save refreshed tokens
-                from teslabar.crypto.credential_store import (
-                    load_credentials,
-                    save_credentials,
-                )
-                try:
-                    stored = load_credentials(password)
-                except Exception:
-                    stored = dict(creds)
-                stored.update(tesla.get_tokens())
-                save_credentials(stored, password)
+    async def _startup_discover():
+        try:
+            if tesla.is_authenticated and not tesla.token_expired:
+                await tesla.register_partner()
                 await tesla.discover_vehicle()
-        asyncio.ensure_future(_try_refresh())
+            elif tesla.is_authenticated and tesla._refresh_token:
+                success = await tesla.refresh_access_token()
+                if success:
+                    from teslabar.crypto.credential_store import (
+                        load_credentials as _load,
+                        save_credentials as _save,
+                    )
+                    try:
+                        stored = _load(password)
+                    except Exception:
+                        stored = dict(creds)
+                    stored.update(tesla.get_tokens())
+                    _save(stored, password)
+                    await tesla.register_partner()
+                    await tesla.discover_vehicle()
+        except Exception as e:
+            logger.error("Startup discovery failed: %s", e)
+
+    if tesla.is_authenticated:
+        asyncio.ensure_future(_startup_discover())
 
     # Create tray
     tray = TeslaBarTray(app, tesla, password)
