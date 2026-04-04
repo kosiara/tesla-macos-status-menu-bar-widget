@@ -167,6 +167,16 @@ class SettingsWindow(QWidget):
         self._show_qr_btn.clicked.connect(self._on_show_qr)
         vk_layout.addWidget(self._show_qr_btn)
 
+        domain = self._cfg.get("github_pages_domain", "").strip()
+        if domain:
+            ak_url = f"https://tesla.com/_ak/{domain}"
+            self._ak_link = QLabel(
+                f'<a href="{ak_url}">{ak_url}</a>'
+            )
+            self._ak_link.setOpenExternalLinks(True)
+            self._ak_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+            vk_layout.addWidget(self._ak_link)
+
         layout.addWidget(vk_group)
 
         # Save / Close
@@ -228,6 +238,7 @@ class SettingsWindow(QWidget):
         domain = self._domain_input.text().strip()
         if not domain:
             QMessageBox.warning(self, "Domain", "Enter your GitHub Pages domain first.")
+            self._domain_input.setText("exampleuser.github.io")
             return
         instructions = get_github_pages_instructions(domain)
         QMessageBox.information(self, "Virtual Key Setup", instructions)
@@ -236,6 +247,7 @@ class SettingsWindow(QWidget):
         domain = self._domain_input.text().strip()
         if not domain:
             QMessageBox.warning(self, "Domain", "Enter your GitHub Pages domain first.")
+            self._domain_input.setText("exampleuser.github.io")
             return
         url = f"https://tesla.com/_ak/{domain}"
         try:
