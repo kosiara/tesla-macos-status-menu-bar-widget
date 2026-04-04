@@ -68,6 +68,10 @@ class SettingsWindow(QWidget):
         self._reauth_btn.clicked.connect(self._on_reauth)
         oauth_layout.addRow(self._reauth_btn)
 
+        self._clear_token_btn = QPushButton("Clear Access Token")
+        self._clear_token_btn.clicked.connect(self._on_clear_token)
+        oauth_layout.addRow(self._clear_token_btn)
+
         layout.addWidget(oauth_group)
 
         # General settings
@@ -223,6 +227,22 @@ class SettingsWindow(QWidget):
     def _on_reauth(self) -> None:
         if self._tesla and hasattr(self._tesla, "_reauth_callback"):
             self._tesla._reauth_callback()
+
+    def _on_clear_token(self) -> None:
+        from teslabar.crypto.credential_store import load_credentials, save_credentials
+        try:
+            creds = load_credentials(self._password)
+        except Exception:
+            creds = {}
+        creds.pop("access_token", None)
+        creds.pop("refresh_token", None)
+        creds.pop("token_expiry", None)
+        save_credentials(creds, self._password)
+        if self._tesla:
+            self._tesla._access_token = ""
+            self._tesla._refresh_token = ""
+            self._tesla._token_expiry = 0.0
+        QMessageBox.information(self, "Token Cleared", "Access token cleared. Re-authenticate to get a new one.")
 
     def _on_generate_key(self) -> None:
         _priv, pub = generate_key_pair()
