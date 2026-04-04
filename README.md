@@ -63,3 +63,62 @@ pip install PySide6 tesla-fleet-api cryptography keyring "qrcode[pil]" aiohttp
 ```
 
 On first launch, you'll be prompted to set a password and enter your Tesla OAuth Client ID and Client Secret from [developer.tesla.com](https://developer.tesla.com).
+
+
+<h2>Host your public key on GitHub Pages (click to expand)</h2>
+<details>
+### Step 1 — Create a GitHub repository
+
+Create a public GitHub repository, for example `tesla-public-key`, and clone it locally.
+
+```bash
+git clone https://github.com/<your-username>/tesla-public-key.git
+cd tesla-public-key
+```
+
+### Step 2 — Create the required directory structure
+
+Tesla expects the public key file to exist at the exact `/.well-known/appspecific/com.tesla.3p.public-key.pem` path. Because GitHub Pages uses Jekyll by default, you must also add `_config.yml` with `include: [".well-known"]` or the folder may not be published.
+
+```bash
+mkdir -p .well-known/appspecific/
+cp ~/TeslaKeys/tesla-public-key.pem .well-known/appspecific/com.tesla.3p.public-key.pem
+echo 'include: [".well-known"]' > _config.yml
+```
+
+Your repository should look like this:
+
+```text
+tesla-public-key/
+├── _config.yml
+├── README.md
+└── .well-known/
+    └── appspecific/
+        └── com.tesla.3p.public-key.pem
+```
+
+### Step 3 — Commit and push
+
+```bash
+git add .
+git commit -m "Add Tesla Fleet API public key"
+git push origin main
+```
+
+### Step 4 — Enable GitHub Pages
+
+In your repository, open **Settings → Pages**, choose **Deploy from a branch**, select `main` and `/ (root)`, then save. GitHub Pages will publish your site at a URL like `https://<username>.github.io/<repo-name>/`.
+
+If you are using a project Pages site like `https://<username>.github.io/<repo-name>/`, the public key will be under that repository path as well, for example: `https://<username>.github.io/<repo-name>/.well-known/appspecific/com.tesla.3p.public-key.pem`. That means the domain you enter elsewhere must match the actual hosted URL structure you are using.
+
+### Step 5 — Verify the file is reachable
+
+Check that the file is publicly accessible and returns HTTP 200.
+
+```bash
+curl -I "https://<username>.github.io/<repo-name>/.well-known/appspecific/com.tesla.3p.public-key.pem"
+```
+
+You should be able to open the URL in a browser and see a PEM public key beginning with `-----BEGIN PUBLIC KEY-----`. Tesla integrations commonly fail when this file is missing or the URL path does not exactly match what Tesla expects.
+
+</details>
