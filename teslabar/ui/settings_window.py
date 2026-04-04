@@ -100,29 +100,30 @@ class SettingsWindow(QWidget):
         vk_group = QGroupBox("Virtual Key")
         vk_layout = QVBoxLayout(vk_group)
 
-        setup_info = QLabel(
-            "<b>Required for Tesla Fleet API access:</b><br><br>"
-            "1. Generate a key pair below<br>"
-            "2. Create a GitHub repo with Pages enabled<br>"
-            "3. Host the public key at:<br>"
-            "&nbsp;&nbsp;<code>https://&lt;domain&gt;/.well-known/appspecific/"
-            "com.tesla.3p.public-key.pem</code><br>"
-            "4. Enter your GitHub Pages domain below (e.g. username.github.io)<br>"
-            "5. Save settings and restart the app<br>"
-            "6. Open <code>https://tesla.com/_ak/&lt;domain&gt;</code> on your phone<br>"
-            "7. Tap 'Allow' on your vehicle's screen to install the virtual key"
-        )
-        setup_info.setWordWrap(True)
-        setup_info.setStyleSheet(
-            "background-color: #ff0022; padding: 8px; border: 1px solid #ffc107; border-radius: 4px;"
-        )
+        if not (self._tesla and self._tesla.partner_registered):
+            setup_info = QLabel(
+                "<b>Required for Tesla Fleet API access:</b><br><br>"
+                "1. Generate a key pair below<br>"
+                "2. Create a GitHub repo with Pages enabled<br>"
+                "3. Host the public key at:<br>"
+                "&nbsp;&nbsp;<code>https://&lt;domain&gt;/.well-known/appspecific/"
+                "com.tesla.3p.public-key.pem</code><br>"
+                "4. Enter your GitHub Pages domain below (e.g. username.github.io)<br>"
+                "5. Save settings and restart the app<br>"
+                "6. Open <code>https://tesla.com/_ak/&lt;domain&gt;</code> on your phone<br>"
+                "7. Tap 'Allow' on your vehicle's screen to install the virtual key"
+            )
+            setup_info.setWordWrap(True)
+            setup_info.setStyleSheet(
+                "background-color: #ff0022; padding: 8px; border: 1px solid #ffc107; border-radius: 4px;"
+            )
 
-        setup_scroll = QScrollArea()
-        setup_scroll.setWidget(setup_info)
-        setup_scroll.setWidgetResizable(True)
-        setup_scroll.setMinimumHeight(120)
-        setup_scroll.setMaximumHeight(160)
-        vk_layout.addWidget(setup_scroll)
+            setup_scroll = QScrollArea()
+            setup_scroll.setWidget(setup_info)
+            setup_scroll.setWidgetResizable(True)
+            setup_scroll.setMinimumHeight(120)
+            setup_scroll.setMaximumHeight(160)
+            vk_layout.addWidget(setup_scroll)
 
         if key_pair_exists():
             vk_layout.addWidget(QLabel("Key pair exists."))

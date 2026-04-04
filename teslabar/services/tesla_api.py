@@ -75,6 +75,7 @@ class TeslaService:
         self._region: str = "eu"  # default, will be auto-detected
         self.vehicle_data = VehicleData()
         self._command_status: str = ""
+        self.partner_registered: bool = False
         self._reauth_callback = None
 
     @property
@@ -157,6 +158,8 @@ class TeslaService:
                 reg_data = await reg_resp.json()
                 if reg_resp.ok:
                     logger.info("Partner domain registered: %s", reg_data)
+                    self.partner_registered = True
+                    return True
                 else:
                     logger.error(
                         "Partner domain registration failed (HTTP %s): %s\n"
@@ -165,7 +168,7 @@ class TeslaService:
                         "  https://%s/.well-known/appspecific/com.tesla.3p.public-key.pem",
                         reg_resp.status, reg_data, clean_domain, clean_domain,
                     )
-                return True
+                    return False
         except Exception as e:
             logger.error("Partner registration failed: %s", e)
             return False
