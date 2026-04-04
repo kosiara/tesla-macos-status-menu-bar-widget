@@ -23,11 +23,18 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         error = params.get("error", [None])[0]
 
         logger.info("OAuth: code=%s, state=%s, error=%s", code, state, error)
+
+        # Ignore unrelated requests (e.g. /favicon.ico) — don't overwrite result
+        if not code and not error and parsed.path != "/callback":
+            self.send_response(404)
+            self.end_headers()
+            return
+
         if error:
             _callback_result = {"error": error}
         elif code:
             _callback_result = {"code": code, "state": state}
-        else:
+        elif _callback_result is None:
             _callback_result = {"error": "No code received"}
 
         self.send_response(200)

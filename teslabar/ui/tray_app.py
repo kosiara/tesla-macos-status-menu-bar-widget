@@ -196,9 +196,15 @@ class TeslaBarTray:
     async def _do_refresh(self) -> None:
         try:
             await self._tesla.fetch_vehicle_data()
-        except RuntimeError as e:
-            if "expired" in str(e).lower():
+        except Exception as e:
+            err_name = type(e).__name__.lower()
+            err_msg = str(e).lower()
+            if "expired" in err_name or "expired" in err_msg or "oauthexpired" in err_name:
                 self._tesla.vehicle_data.state = VehicleState.AUTH_EXPIRED
+            else:
+                logger.error("Refresh error: %s", e)
+                self._tesla.vehicle_data.state = VehicleState.ERROR
+                self._tesla.vehicle_data.error_message = str(e)
         self._update_menu()
 
     def _update_menu(self) -> None:
