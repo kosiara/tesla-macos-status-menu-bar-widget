@@ -69,11 +69,13 @@ On first launch, you'll be prompted to set a password and enter your Tesla OAuth
 <details>
 ### Step 1 — Create a GitHub repository
 
-Create a public GitHub repository, for example `tesla-public-key`, and clone it locally.
+Tesla requires the public key to be served at the **root of your GitHub Pages domain**, e.g. `https://<username>.github.io/.well-known/appspecific/com.tesla.3p.public-key.pem`. This means you must use your **user site repository** (`<username>.github.io`), not a project repository with a subpath.
+
+Create a public GitHub repository named `<your-username>.github.io` and clone it locally.
 
 ```bash
-git clone https://github.com/<your-username>/tesla-public-key.git
-cd tesla-public-key
+git clone https://github.com/<your-username>/<your-username>.github.io.git
+cd <your-username>.github.io
 ```
 
 ### Step 2 — Create the required directory structure
@@ -89,7 +91,7 @@ echo 'include: [".well-known"]' > _config.yml
 Your repository should look like this:
 
 ```text
-tesla-public-key/
+<username>.github.io/
 ├── _config.yml
 ├── README.md
 └── .well-known/
@@ -107,16 +109,16 @@ git push origin main
 
 ### Step 4 — Enable GitHub Pages
 
-In your repository, open **Settings → Pages**, choose **Deploy from a branch**, select `main` and `/ (root)`, then save. GitHub Pages will publish your site at a URL like `https://<username>.github.io/<repo-name>/`.
+In your repository, open **Settings → Pages**, choose **Deploy from a branch**, select `main` and `/ (root)`, then save. GitHub Pages will publish your site at `https://<username>.github.io/`.
 
-If you are using a project Pages site like `https://<username>.github.io/<repo-name>/`, the public key will be under that repository path as well, for example: `https://<username>.github.io/<repo-name>/.well-known/appspecific/com.tesla.3p.public-key.pem`. That means the domain you enter elsewhere must match the actual hosted URL structure you are using.
+**Important:** Tesla requires the key at the root of the domain (`https://<username>.github.io/.well-known/...`), so you must use the user site repository (`<username>.github.io`), not a project repository with a subpath.
 
 ### Step 5 — Verify the file is reachable
 
 Check that the file is publicly accessible and returns HTTP 200.
 
 ```bash
-curl -I "https://<username>.github.io/<repo-name>/.well-known/appspecific/com.tesla.3p.public-key.pem"
+curl -I "https://<username>.github.io/.well-known/appspecific/com.tesla.3p.public-key.pem"
 ```
 
 You should be able to open the URL in a browser and see a PEM public key beginning with `-----BEGIN PUBLIC KEY-----`. Tesla integrations commonly fail when this file is missing or the URL path does not exactly match what Tesla expects.
