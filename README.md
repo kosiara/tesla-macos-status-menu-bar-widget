@@ -64,6 +64,58 @@ pip install PySide6 tesla-fleet-api cryptography keyring "qrcode[pil]" aiohttp
 
 On first launch, you'll be prompted to set a password and enter your Tesla OAuth Client ID and Client Secret from [developer.tesla.com](https://developer.tesla.com).
 
+## Tesla Fleet API Setup
+
+Follow these steps to register your app with the Tesla Fleet API and connect it to your vehicle.
+
+### Step 1 — Create a Tesla Developer App
+
+1. Go to [developer.tesla.com](https://developer.tesla.com) and sign in with your Tesla account.
+2. Create a new application.
+3. Configure the **OAuth Grant Type** to include both `client-credentials` and `authorization-code`.
+4. Set the following URLs:
+
+| Field | Value |
+|---|---|
+| **Allowed Origin(s)** | `http://localhost:8457` and `https://<username>.github.io` |
+| **Allowed Redirect URI(s)** | `http://localhost:8457/callback` |
+| **Allowed Returned URL(s)** | *(leave empty)* |
+
+![Tesla Developer App — OAuth settings](resources/screenshots/tesla_dev_oauth_settings.png)
+
+5. Note down your **Client ID** and **Client Secret** — you'll need them on first launch.
+
+### Step 2 — Authorize the app with your Tesla account
+
+When TeslaBar starts the OAuth flow, your browser will open the Tesla consent screen. Make sure to check both:
+
+- **Vehicle Information** — live data, service history, scheduling, nearby Superchargers
+- **Vehicle Commands** — add/remove driver, unlock, wake up, remote start, schedule updates
+
+Click **Allow** to grant access.
+
+![Tesla OAuth consent screen](resources/screenshots/tesla_oauth_consent.png)
+
+### Step 3 — Set up the Virtual Key
+
+Tesla Fleet API requires a third-party virtual key to be installed on your vehicle before you can send commands.
+
+1. Open **TeslaBar → Settings** and generate a key pair in the **Virtual Key** section.
+2. Host the public key on GitHub Pages (see section below).
+3. Enter your GitHub Pages domain (e.g. `username.github.io`) in Settings and click **Save**.
+
+![TeslaBar Settings — Virtual Key section](resources/screenshots/teslabar_settings.png)
+
+### Step 4 — Install the Virtual Key on your vehicle
+
+1. Open `https://tesla.com/_ak/<your-domain>` on your phone (or scan the QR code from Settings).
+2. The Tesla app will prompt you to **Set Up Third-Party Virtual Key**.
+3. Tap **Finish Setup** while near your vehicle — the car's screen will ask you to confirm.
+
+![Tesla Virtual Key setup screen](resources/screenshots/tesla_virtual_key_setup.png)
+
+After the key is installed, TeslaBar can send commands (start/stop charge, climate, etc.) to your vehicle.
+
 
 <h2>Host your public key on GitHub Pages (click to expand)</h2>
 <details>
