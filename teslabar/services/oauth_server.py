@@ -62,4 +62,4 @@ def get_callback_result() -> dict | None:
 
 
 def get_local_redirect_uri(port: int = 8457) -> str:
-    return f"http://127.0.0.1:{port}/callback"
+    return f"http://localhost:{port}/callback"

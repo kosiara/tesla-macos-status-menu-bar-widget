@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
@@ -122,11 +123,11 @@ class TeslaService:
         scope_str = "%20".join(scopes)
         return (
             f"https://auth.tesla.com/oauth2/v3/authorize"
-            f"?client_id={self._client_id}"
-            f"&redirect_uri={redirect_uri}"
+            f"?client_id={quote(self._client_id, safe='')}"
+            f"&redirect_uri={quote(redirect_uri, safe='')}"
             f"&response_type=code"
-            f"&scope={scope_str}"
-            f"&state={state}"
+            f"&scope={quote(' '.join(scopes), safe='')}"
+            f"&state={quote(state, safe='')}"
         )
 
     async def exchange_code(self, code: str, redirect_uri: str) -> dict:
