@@ -126,11 +126,19 @@ class TeslaService:
                     except Exception as e:
                         logger.warning("Partner domain registration: %s (may already be registered)", e)
                 else:
-                    logger.warning("No domain configured — partner domain registration skipped. "
-                                   "Set your GitHub Pages domain in Settings.")
+                    logger.warning(
+                        "No GitHub Pages domain configured — partner domain registration skipped.\n"
+                        "  To fix this:\n"
+                        "  1. Open Settings in TeslaBar\n"
+                        "  2. Generate a Virtual Key pair (if not done)\n"
+                        "  3. Create a GitHub repo with Pages enabled\n"
+                        "  4. Host your public key at: https://<your-domain>/.well-known/appspecific/com.tesla.3p.public-key.pem\n"
+                        "  5. Enter your GitHub Pages domain (e.g. username.github.io) in Settings\n"
+                        "  6. Restart the app"
+                    )
                 return True
         except Exception as e:
-            logger.warning("Partner registration: %s", e)
+            logger.warning("Partner registration failed: %s", e)
             return False
 
     def get_tokens(self) -> dict:
@@ -264,9 +272,21 @@ class TeslaService:
             logger.info("Discovered vehicle: %s", self._vin)
             return True
         except Exception as e:
-            logger.error("Vehicle discovery failed: %s", e)
-            self.vehicle_data.state = VehicleState.ERROR
-            self.vehicle_data.error_message = str(e)
+            err_name = type(e).__name__
+            if "PreconditionFailed" in err_name:
+                msg = (
+                    "Partner domain not registered. "
+                    "Open Settings → set GitHub Pages domain → "
+                    "host your public key at https://<domain>/"
+                    ".well-known/appspecific/com.tesla.3p.public-key.pem → restart app."
+                )
+                logger.error("Vehicle discovery failed: %s — %s", e, msg)
+                self.vehicle_data.state = VehicleState.ERROR
+                self.vehicle_data.error_message = msg
+            else:
+                logger.error("Vehicle discovery failed: %s", e)
+                self.vehicle_data.state = VehicleState.ERROR
+                self.vehicle_data.error_message = str(e)
             return False
 
     async def _wake_if_needed(self) -> bool:

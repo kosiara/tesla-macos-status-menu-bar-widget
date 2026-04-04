@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QComboBox,
     QPushButton,
+    QScrollArea,
     QTextEdit,
     QMessageBox,
 )
@@ -37,7 +38,7 @@ class SettingsWindow(QWidget):
 
         self.setWindowTitle("TeslaBar - Settings")
         self.setMinimumWidth(520)
-        self.setMinimumHeight(600)
+        self.setMinimumHeight(900)
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
         )
@@ -99,6 +100,30 @@ class SettingsWindow(QWidget):
         vk_group = QGroupBox("Virtual Key")
         vk_layout = QVBoxLayout(vk_group)
 
+        setup_info = QLabel(
+            "<b>Required for Tesla Fleet API access:</b><br><br>"
+            "1. Generate a key pair below<br>"
+            "2. Create a GitHub repo with Pages enabled<br>"
+            "3. Host the public key at:<br>"
+            "&nbsp;&nbsp;<code>https://&lt;domain&gt;/.well-known/appspecific/"
+            "com.tesla.3p.public-key.pem</code><br>"
+            "4. Enter your GitHub Pages domain below (e.g. username.github.io)<br>"
+            "5. Save settings and restart the app<br>"
+            "6. Open <code>https://tesla.com/_ak/&lt;domain&gt;</code> on your phone<br>"
+            "7. Tap 'Allow' on your vehicle's screen to install the virtual key"
+        )
+        setup_info.setWordWrap(True)
+        setup_info.setStyleSheet(
+            "background-color: #ff0022; padding: 8px; border: 1px solid #ffc107; border-radius: 4px;"
+        )
+
+        setup_scroll = QScrollArea()
+        setup_scroll.setWidget(setup_info)
+        setup_scroll.setWidgetResizable(True)
+        setup_scroll.setMinimumHeight(120)
+        setup_scroll.setMaximumHeight(160)
+        vk_layout.addWidget(setup_scroll)
+
         if key_pair_exists():
             vk_layout.addWidget(QLabel("Key pair exists."))
             pub_key = get_public_key_pem()
@@ -107,10 +132,12 @@ class SettingsWindow(QWidget):
                 pub_text.setPlainText(pub_key)
                 pub_text.setReadOnly(True)
                 pub_text.setMaximumHeight(100)
-                vk_layout.addWidget(QLabel("Public key:"))
+                vk_layout.addWidget(QLabel("Public key (copy this into your GitHub repo):"))
                 vk_layout.addWidget(pub_text)
         else:
-            vk_layout.addWidget(QLabel("No virtual key pair found."))
+            no_key_label = QLabel("No virtual key pair found. Generate one first.")
+            no_key_label.setStyleSheet("color: red; font-weight: bold;")
+            vk_layout.addWidget(no_key_label)
 
         gen_btn = QPushButton(
             "Regenerate Key Pair" if key_pair_exists() else "Generate Key Pair"
