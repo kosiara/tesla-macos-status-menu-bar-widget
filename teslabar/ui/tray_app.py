@@ -31,8 +31,8 @@ from teslabar.ui.charge_limit_popup import ChargeLimitPopup
 from teslabar.ui.schedule_window import (
     PreconditionListWindow,
     ChargingListWindow,
-    PreconditionSetWindow,
 )
+from teslabar.ui.preconditioning_set_schedule_window import PreconditionSetWindow
 
 logger = logging.getLogger(__name__)
 
