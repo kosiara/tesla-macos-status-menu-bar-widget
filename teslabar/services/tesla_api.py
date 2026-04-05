@@ -10,6 +10,8 @@ from urllib.parse import quote
 
 import aiohttp
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+from teslabar.config import load_config, save_config
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
 from tesla_fleet_api.tesla.vehicle.signed import VehicleSigned
@@ -39,6 +41,8 @@ class VehicleData:
     climate_on: bool = False
     inside_temp: float | None = None
     outside_temp: float | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     error_message: str = ""
     last_updated: float = 0.0
 
@@ -81,6 +85,7 @@ class TeslaService:
         self._command_status: str = ""
         self.partner_registered: bool = False
         self._reauth_callback = None
+        self._load_saved_location()
 
     @property
     def command_status(self) -> str:
@@ -387,6 +392,30 @@ class TeslaService:
                 return False
         return True
 
+    def _update_location(self, data: dict) -> None:
+        """Update vehicle location from drive_state if available, persisting to config."""
+        drive = data.get("drive_state", {})
+        lat = drive.get("latitude")
+        lon = drive.get("longitude")
+        if lat is not None and lon is not None:
+            self.vehicle_data.latitude = lat
+            self.vehicle_data.longitude = lon
+            cfg = load_config()
+            cfg["vehicle_latitude"] = lat
+            cfg["vehicle_longitude"] = lon
+            save_config(cfg)
+            logger.info("Vehicle location updated and saved: %.6f, %.6f", lat, lon)
+
+    def _load_saved_location(self) -> None:
+        """Load last known vehicle location from config."""
+        cfg = load_config()
+        lat = cfg.get("vehicle_latitude")
+        lon = cfg.get("vehicle_longitude")
+        if lat is not None and lon is not None:
+            self.vehicle_data.latitude = lat
+            self.vehicle_data.longitude = lon
+            logger.info("Loaded saved vehicle location: %.6f, %.6f", lat, lon)
+
     async def fetch_vehicle_data(self) -> VehicleData:
         try:
             vehicle = await self._ensure_vehicle()
@@ -397,6 +426,7 @@ class TeslaService:
                         "charge_state",
                         "climate_state",
                         "vehicle_state",
+                        "drive_state",
                     ],
                 )
             except VehicleOffline:
@@ -411,6 +441,7 @@ class TeslaService:
                         "charge_state",
                         "climate_state",
                         "vehicle_state",
+                        "drive_state",
                     ],
                 )
 
@@ -419,14 +450,17 @@ class TeslaService:
 
             if state_str == "asleep":
                 self.vehicle_data.state = VehicleState.ASLEEP
+                self._update_location(data)
                 return self.vehicle_data
             if state_str == "offline":
                 self.vehicle_data.state = VehicleState.OFFLINE
+                self._update_location(data)
                 return self.vehicle_data
 
             charge = data.get("charge_state", {})
             climate = data.get("climate_state", {})
             vstate = data.get("vehicle_state", {})
+            drive = data.get("drive_state", {})
 
             self.vehicle_data = VehicleData(
                 state=VehicleState.ONLINE,
@@ -438,6 +472,8 @@ class TeslaService:
                 climate_on=climate.get("is_climate_on", False),
                 inside_temp=climate.get("inside_temp"),
                 outside_temp=climate.get("outside_temp"),
+                latitude=drive.get("latitude"),
+                longitude=drive.get("longitude"),
                 last_updated=time.time(),
             )
             self._command_status = ""
@@ -567,12 +603,15 @@ class TeslaService:
     async def add_precondition_schedule(
         self, days_of_week: int, time_minutes: int, one_time: bool = False
     ) -> bool:
+        lat = self.vehicle_data.latitude or 0.0
+        lon = self.vehicle_data.longitude or 0.0
+        logger.info("Adding precondition schedule at location: %.6f, %.6f", lat, lon)
         return await self._send_command(
             "add_precondition_schedule",
             days_of_week=days_of_week,
             enabled=True,
-            lat=0.0,
-            lon=0.0,
+            lat=lat,
+            lon=lon,
             precondition_time=time_minutes,
             one_time=one_time,
         )

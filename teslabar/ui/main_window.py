@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
     QGroupBox,
+    QTabWidget,
 )
 from PySide6.QtCore import Qt, QTimer
 
@@ -39,6 +40,20 @@ class MainWindow(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_general_tab(), "General")
+        self._tabs.addTab(self._build_location_tab(), "Location")
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self._tabs)
+
+        close_btn = QPushButton("Close Window")
+        close_btn.clicked.connect(self.close)
+        layout.addWidget(close_btn, alignment=Qt.AlignRight)
+
+    def _build_general_tab(self) -> QWidget:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
 
         # Status
         self._status_label = QLabel("Status: loading...")
@@ -97,10 +112,80 @@ class MainWindow(QWidget):
         layout.addWidget(climate_group)
 
         layout.addStretch()
+        return tab
 
-        close_btn = QPushButton("Close Window")
-        close_btn.clicked.connect(self.close)
-        layout.addWidget(close_btn, alignment=Qt.AlignRight)
+    def _build_location_tab(self) -> QWidget:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        self._location_status_label = QLabel("")
+        self._location_status_label.setStyleSheet("color: #0066cc;")
+        layout.addWidget(self._location_status_label)
+
+        self._lat_label = QLabel("Latitude: --")
+        self._lat_label.setStyleSheet("font-size: 14px;")
+        layout.addWidget(self._lat_label)
+
+        self._lon_label = QLabel("Longitude: --")
+        self._lon_label.setStyleSheet("font-size: 14px;")
+        layout.addWidget(self._lon_label)
+
+        self._location_updated_label = QLabel("")
+        self._location_updated_label.setStyleSheet("color: gray; font-size: 12px;")
+        layout.addWidget(self._location_updated_label)
+
+        refresh_btn = QPushButton("Refresh Location")
+        refresh_btn.clicked.connect(self._on_refresh_location)
+        layout.addWidget(refresh_btn)
+
+        layout.addStretch()
+        return tab
+
+    def _on_tab_changed(self, index: int) -> None:
+        if index == 1:  # Location tab
+            self._on_refresh_location()
+
+    def _on_refresh_location(self) -> None:
+        self._location_status_label.setText("Fetching location...")
+        asyncio.ensure_future(self._do_refresh_location())
+
+    async def _do_refresh_location(self) -> None:
+        try:
+            vehicle = await self._tesla._ensure_vehicle()
+            resp = await vehicle.vehicle_data(endpoints=["drive_state"])
+            data = resp.get("response", {})
+            drive = data.get("drive_state", {})
+            lat = drive.get("latitude")
+            lon = drive.get("longitude")
+            if lat is not None and lon is not None:
+                self._tesla._update_location(data)
+                self._lat_label.setText(f"Latitude: {lat:.6f}")
+                self._lon_label.setText(f"Longitude: {lon:.6f}")
+                self._location_status_label.setText("Location fetched successfully.")
+                self._location_status_label.setStyleSheet("color: green;")
+                import time
+                from datetime import datetime
+                self._location_updated_label.setText(
+                    f"Updated: {datetime.now().strftime('%H:%M:%S')}"
+                )
+            else:
+                self._location_status_label.setText(
+                    "Location not available (vehicle may be asleep)."
+                )
+                self._location_status_label.setStyleSheet("color: orange;")
+                # Show saved location if available
+                vd = self._tesla.vehicle_data
+                if vd.latitude and vd.longitude:
+                    self._lat_label.setText(f"Latitude: {vd.latitude:.6f} (saved)")
+                    self._lon_label.setText(f"Longitude: {vd.longitude:.6f} (saved)")
+        except BaseException as e:
+            self._location_status_label.setText(f"Error: {e}")
+            self._location_status_label.setStyleSheet("color: red;")
+            # Show saved location as fallback
+            vd = self._tesla.vehicle_data
+            if vd.latitude and vd.longitude:
+                self._lat_label.setText(f"Latitude: {vd.latitude:.6f} (saved)")
+                self._lon_label.setText(f"Longitude: {vd.longitude:.6f} (saved)")
 
     def _on_refresh(self) -> None:
         asyncio.ensure_future(self._do_refresh())
