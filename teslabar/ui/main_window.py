@@ -17,6 +17,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from teslabar.config import load_config
 from teslabar.services.tesla_api import TeslaService, VehicleState
+from teslabar.ui.main_window_location import LocationTab
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,10 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(self)
 
         self._tabs = QTabWidget()
-        self._tabs.addTab(self._build_general_tab(), "General")
-        self._tabs.addTab(self._build_location_tab(), "Location")
+        general_tab = self._build_general_tab()
+        self._location_tab = LocationTab(self._tesla)
+        self._tabs.addTab(general_tab, "General")
+        self._tabs.addTab(self._location_tab, "Location")
         self._tabs.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self._tabs)
 
@@ -117,89 +120,9 @@ class MainWindow(QWidget):
         layout.addStretch()
         return tab
 
-    def _build_location_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        self._location_status_label = QLabel("")
-        self._location_status_label.setStyleSheet("color: #0066cc;")
-        layout.addWidget(self._location_status_label)
-
-        self._lat_label = QLabel("Latitude: --")
-        self._lat_label.setStyleSheet("font-size: 14px;")
-        layout.addWidget(self._lat_label)
-
-        self._lon_label = QLabel("Longitude: --")
-        self._lon_label.setStyleSheet("font-size: 14px;")
-        layout.addWidget(self._lon_label)
-
-        self._location_updated_label = QLabel("")
-        self._location_updated_label.setStyleSheet("color: gray; font-size: 12px;")
-        layout.addWidget(self._location_updated_label)
-
-        refresh_btn = QPushButton("Refresh Location")
-        refresh_btn.clicked.connect(self._on_refresh_location)
-        layout.addWidget(refresh_btn)
-
-        self._location_save_label = QLabel("")
-
-        layout.addStretch()
-        return tab
-
     def _on_tab_changed(self, index: int) -> None:
-        if index == 1:  # Location tab
-            self._on_refresh_location()
-
-    def _on_refresh_location(self) -> None:
-        self._location_status_label.setText("Fetching location...")
-        asyncio.ensure_future(self._do_refresh_location())
-
-    async def _do_refresh_location(self) -> None:
-        lat, lon = None, None
-        try:
-            vehicle = await self._tesla._ensure_vehicle()
-
-            # Try drive_state first
-            logger.info("Fetching location via vehicle_data(endpoints=['drive_state'])")
-            resp = await vehicle.vehicle_data(endpoints=["drive_state"])
-            logger.info("drive_state response: %s", resp)
-            data = resp.get("response", {})
-            drive = data.get("drive_state", {})
-            lat = drive.get("latitude")
-            lon = drive.get("longitude")
-
-            # Fall back to location_data if drive_state had no coordinates
-            if lat is None or lon is None:
-                try:
-                    logger.info("drive_state had no coordinates, trying location_data")
-                    resp2 = await vehicle.vehicle_data(endpoints=["location_data"])
-                    logger.info("location_data response: %s", resp2)
-                    data2 = resp2.get("response", {})
-                    loc = data2.get("drive_state", {})
-                    lat = loc.get("latitude")
-                    lon = loc.get("longitude")
-                except BaseException as e2:
-                    logger.warning("location_data endpoint failed: %s", e2)
-
-            if lat is not None and lon is not None:
-                self._tesla._update_location({"drive_state": {"latitude": lat, "longitude": lon}})
-                self._lat_label.setText(str(lat))
-                self._lon_label.setText(str(lon))
-                self._location_status_label.setText("Location fetched.")
-                self._location_status_label.setStyleSheet("color: green;")
-                from datetime import datetime
-                self._location_save_label.setText(
-                    f"Updated: {datetime.now().strftime('%H:%M:%S')}"
-                )
-            else:
-                self._location_status_label.setText(
-                    "Could not fetch location. Enter coordinates manually."
-                )
-                self._location_status_label.setStyleSheet("color: orange;")
-        except BaseException as e:
-            logger.error("Location fetch error: %s", e)
-            self._location_status_label.setText(f"Error: {e}")
-            self._location_status_label.setStyleSheet("color: red;")
+        if index == 1:
+            self._location_tab.on_tab_selected()
 
     def _on_refresh(self) -> None:
         asyncio.ensure_future(self._do_refresh())
