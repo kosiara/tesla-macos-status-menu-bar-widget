@@ -61,6 +61,7 @@ def start_callback_server(port: int = 8457) -> None:
 
 def stop_callback_server() -> None:
     global _server
+    logger.info("OAuth callback server shutting down....")
     if _server:
         _server.shutdown()
         _server = None
