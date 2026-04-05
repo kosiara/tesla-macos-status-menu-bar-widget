@@ -28,7 +28,7 @@ class MainWindow(QWidget):
         self._cfg = load_config()
 
         self.setWindowTitle("TeslaBar")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(500)
         self.setMinimumHeight(450)
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
@@ -141,6 +141,8 @@ class MainWindow(QWidget):
         refresh_btn.clicked.connect(self._on_refresh_location)
         layout.addWidget(refresh_btn)
 
+        self._location_save_label = QLabel("")
+
         layout.addStretch()
         return tab
 
@@ -173,7 +175,7 @@ class MainWindow(QWidget):
                     resp2 = await vehicle.vehicle_data(endpoints=["location_data"])
                     logger.info("location_data response: %s", resp2)
                     data2 = resp2.get("response", {})
-                    loc = data2.get("location_data", {})
+                    loc = data2.get("drive_state", {})
                     lat = loc.get("latitude")
                     lon = loc.get("longitude")
                 except BaseException as e2:
@@ -181,9 +183,9 @@ class MainWindow(QWidget):
 
             if lat is not None and lon is not None:
                 self._tesla._update_location({"drive_state": {"latitude": lat, "longitude": lon}})
-                self._lat_input.setText(str(lat))
-                self._lon_input.setText(str(lon))
-                self._location_status_label.setText("Location fetched — press Save to store it.")
+                self._lat_label.setText(str(lat))
+                self._lon_label.setText(str(lon))
+                self._location_status_label.setText("Location fetched.")
                 self._location_status_label.setStyleSheet("color: green;")
                 from datetime import datetime
                 self._location_save_label.setText(
