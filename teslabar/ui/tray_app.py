@@ -146,8 +146,8 @@ class TeslaBarTray:
 
         # 9. Preheating
         self._preheating = PreheatingSection(menu, self._tesla)
-        menu.addAction(self._preheating.widget_action)
-        menu.addSeparator()
+        # menu.addAction(self._preheating.widget_action)
+        # menu.addSeparator()
 
         # 10. Charge level limit
         self._charge_limit_action = QAction("Charge Limit: --%", menu)
