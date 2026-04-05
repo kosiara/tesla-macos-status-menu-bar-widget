@@ -3,6 +3,7 @@
 import asyncio
 import logging
 
+import folium
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -12,11 +13,16 @@ from PySide6.QtWidgets import (
     QFrame,
     QLineEdit,
 )
+from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from teslabar.config import load_config, save_config
 from teslabar.services.tesla_api import TeslaService
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_LAT = 52.23
+DEFAULT_LON = 21.01
+DEFAULT_ZOOM = 5
 
 
 class LocationTab(QWidget):
@@ -68,10 +74,14 @@ class LocationTab(QWidget):
         self._location_save_label.setStyleSheet("color: gray; font-size: 12px;")
         layout.addWidget(self._location_save_label)
 
-        layout.addStretch()
+        # Map view
+        self._map_view = QWebEngineView()
+        self._map_view.setMinimumHeight(300)
+        layout.addWidget(self._map_view)
 
-        # Load saved values
+        # Load saved values and show map
         self._load_location_inputs()
+        self._update_map()
 
     def _load_location_inputs(self) -> None:
         cfg = load_config()
@@ -81,6 +91,28 @@ class LocationTab(QWidget):
             self._lat_input.setText(str(lat))
         if lon is not None:
             self._lon_input.setText(str(lon))
+
+    def _get_input_coords(self) -> tuple[float | None, float | None]:
+        try:
+            lat = float(self._lat_input.text())
+            lon = float(self._lon_input.text())
+            return lat, lon
+        except (ValueError, TypeError):
+            return None, None
+
+    def _update_map(self, lat: float | None = None, lon: float | None = None) -> None:
+        if lat is None or lon is None:
+            lat, lon = self._get_input_coords()
+        if lat is not None and lon is not None:
+            m = folium.Map(location=[lat, lon], zoom_start=15)
+            folium.Marker(
+                [lat, lon],
+                popup=f"Vehicle: {lat:.6f}, {lon:.6f}",
+                tooltip="Vehicle location",
+            ).add_to(m)
+        else:
+            m = folium.Map(location=[DEFAULT_LAT, DEFAULT_LON], zoom_start=DEFAULT_ZOOM)
+        self._map_view.setHtml(m._repr_html_())
 
     def _on_save_location(self) -> None:
         try:
@@ -99,6 +131,7 @@ class LocationTab(QWidget):
         logger.info("Home location saved manually: %.6f, %.6f", lat, lon)
         self._location_save_label.setText(f"Saved: {lat:.6f}, {lon:.6f}")
         self._location_save_label.setStyleSheet("color: green; font-size: 12px;")
+        self._update_map(lat, lon)
 
     def on_tab_selected(self) -> None:
         """Called when user switches to the Location tab."""
@@ -146,6 +179,7 @@ class LocationTab(QWidget):
                 self._location_save_label.setText(
                     f"Updated: {datetime.now().strftime('%H:%M:%S')}"
                 )
+                self._update_map(lat, lon)
             else:
                 self._location_status_label.setText(
                     "Could not fetch location. Enter coordinates manually."
