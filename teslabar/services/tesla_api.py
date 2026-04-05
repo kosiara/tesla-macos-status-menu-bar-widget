@@ -9,8 +9,10 @@ from typing import Any
 from urllib.parse import quote
 
 import aiohttp
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
+from tesla_fleet_api.tesla.vehicle.signed import VehicleSigned
 from tesla_fleet_api.exceptions import TeslaFleetError, VehicleOffline
 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,7 @@ class ScheduleEntry:
 class TeslaService:
     def __init__(self) -> None:
         self._api: TeslaFleetApi | None = None
-        self._vehicle: VehicleFleet | None = None
+        self._vehicle: VehicleSigned | VehicleFleet | None = None
         self._session: aiohttp.ClientSession | None = None
         self._vin: str | None = None
         self._access_token: str = ""
@@ -268,6 +270,20 @@ class TeslaService:
             logger.error("Token refresh error: %s", e)
             return False
 
+    def _load_private_key(self) -> None:
+        """Load the EC private key for signed vehicle commands."""
+        from teslabar.crypto.virtual_key import get_private_key_pem
+        pem = get_private_key_pem()
+        if pem and self._api:
+            try:
+                key = load_pem_private_key(pem.encode(), password=None)
+                self._api.private_key = key
+                logger.info("Private key loaded for signed commands")
+            except Exception as e:
+                logger.warning("Failed to load private key: %s", e)
+        else:
+            logger.warning("No private key found — vehicle commands will not work")
+
     async def _ensure_api(self) -> TeslaFleetApi:
         if self.token_expired and self._refresh_token:
             success = await self.refresh_access_token()
@@ -284,18 +300,25 @@ class TeslaService:
                 access_token=self._access_token,
                 region=self._region,
             )
+            # Load private key for signed commands
+            self._load_private_key()
             logger.info("API initialized with region=%s, server=%s", self._region, self._api.server)
 
         return self._api
 
-    async def _ensure_vehicle(self) -> VehicleFleet:
+    async def _ensure_vehicle(self) -> VehicleSigned | VehicleFleet:
         if self._vehicle is not None:
             return self._vehicle
         api = await self._ensure_api()
         if not self._vin:
             await self.discover_vehicle()
         if self._vin:
-            self._vehicle = api.vehicles.createFleet(self._vin)
+            if api.has_private_key:
+                self._vehicle = api.vehicles.createSigned(self._vin)
+                logger.info("Using signed vehicle commands")
+            else:
+                self._vehicle = api.vehicles.createFleet(self._vin)
+                logger.warning("Using unsigned vehicle commands (no private key)")
         if self._vehicle is None:
             raise RuntimeError("No vehicle available")
         return self._vehicle
@@ -315,7 +338,10 @@ class TeslaService:
                 return False
             v = vehicles[0]
             self._vin = v.get("vin")
-            self._vehicle = api.vehicles.createFleet(self._vin)
+            if api.has_private_key:
+                self._vehicle = api.vehicles.createSigned(self._vin)
+            else:
+                self._vehicle = api.vehicles.createFleet(self._vin)
             logger.info("Discovered vehicle: %s", self._vin)
             return True
         except Exception as e:
