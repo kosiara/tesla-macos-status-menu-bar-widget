@@ -43,6 +43,7 @@ class VehicleData:
     is_preconditioning: bool = False
     inside_temp: float | None = None
     outside_temp: float | None = None
+    driver_temp_setting: float | None = None
     latitude: float | None = None
     longitude: float | None = None
     error_message: str = ""
@@ -482,6 +483,7 @@ class TeslaService:
                 sentry_mode=vstate.get("sentry_mode", False),
                 climate_on=climate.get("is_climate_on", False),
                 is_preconditioning=climate.get("is_preconditioning", False),
+                driver_temp_setting=climate.get("driver_temp_setting"),
                 inside_temp=climate.get("inside_temp"),
                 outside_temp=climate.get("outside_temp"),
                 latitude=drive.get("latitude"),

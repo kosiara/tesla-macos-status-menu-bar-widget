@@ -166,6 +166,11 @@ class TeslaBarTray:
         cabin_temp_widget.setDefaultWidget(self._cabin_temp_label)
         menu.addAction(cabin_temp_widget)
 
+        # 10b. Temperature limit
+        self._temp_limit_action = QAction("Temperature Limit: --", menu)
+        self._temp_limit_action.triggered.connect(self._open_cabin_temp)
+        menu.addAction(self._temp_limit_action)
+
         # 11. Set Precondition schedule
         precond_set_action = QAction("Set Precondition Schedule", menu)
         precond_set_action.triggered.connect(self._open_precond_set)
@@ -331,6 +336,12 @@ class TeslaBarTray:
         else:
             self._cabin_temp_label.setText("Cabin Temperature: --")
 
+        # Temperature limit
+        if vd.driver_temp_setting is not None:
+            self._temp_limit_action.setText(f"Temperature Limit: {vd.driver_temp_setting:.1f}°C")
+        else:
+            self._temp_limit_action.setText("Temperature Limit: --")
+
         # Climate
         climate_text = "Climate: On" if vd.climate_on else "Climate: Off"
         if vd.inside_temp is not None:
@@ -391,7 +402,7 @@ class TeslaBarTray:
         asyncio.ensure_future(self._tesla.set_charge_limit(percent))
 
     def _open_cabin_temp(self) -> None:
-        current = self._tesla.vehicle_data.inside_temp or 20.0
+        current = self._tesla.vehicle_data.driver_temp_setting or 20.0
         self._cabin_temp_popup = CabinTempPopup(current)
         self._cabin_temp_popup.cabin_temp_changed.connect(self._on_cabin_temp_set)
         self._cabin_temp_popup.show()
