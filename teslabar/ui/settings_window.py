@@ -89,6 +89,10 @@ class SettingsWindow(QWidget):
         self._clear_token_btn.clicked.connect(self._on_clear_token)
         oauth_layout.addRow(self._clear_token_btn)
 
+        self._factory_reset_btn = QPushButton("Reset the widget-app to factory-default")
+        self._factory_reset_btn.clicked.connect(self._on_factory_reset)
+        oauth_layout.addRow(self._factory_reset_btn)
+
         return tab
 
     def _build_general_tab(self) -> QWidget:
@@ -233,6 +237,65 @@ class SettingsWindow(QWidget):
     def _on_reauth(self) -> None:
         if self._tesla and hasattr(self._tesla, "_reauth_callback"):
             self._tesla._reauth_callback()
+
+    def _on_factory_reset(self) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Factory Reset",
+            "Do you want to remove all data including client id, secret, tokens, "
+            "site address, public and private keys etc.?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        import platform
+        from teslabar.crypto.credential_store import clear_credentials
+        from teslabar.config import (
+            CONFIG_FILE, VIRTUAL_KEY_FILE, VIRTUAL_PUB_KEY_FILE, APP_DATA_DIR,
+        )
+
+        # Clear credentials (keychain + file)
+        clear_credentials()
+
+        # Clear salt file
+        salt_file = APP_DATA_DIR / "salt.bin"
+        if salt_file.exists():
+            salt_file.unlink()
+
+        # Clear virtual keys (files)
+        for f in (VIRTUAL_KEY_FILE, VIRTUAL_PUB_KEY_FILE):
+            if f.exists():
+                f.unlink()
+
+        # Clear virtual key from keychain
+        if platform.system() == "Darwin":
+            try:
+                import keyring
+                keyring.delete_password("com.teslabar.virtualkey", "private_key")
+            except Exception:
+                pass
+
+        # Clear config file
+        if CONFIG_FILE.exists():
+            CONFIG_FILE.unlink()
+
+        # Clear in-memory state
+        if self._tesla:
+            self._tesla._client_id = ""
+            self._tesla._client_secret = ""
+            self._tesla._access_token = ""
+            self._tesla._refresh_token = ""
+            self._tesla._token_expiry = 0.0
+
+        QMessageBox.information(
+            self, "Factory Reset", "All data has been removed. The app will now quit."
+        )
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app:
+            app.quit()
 
     def _on_clear_token(self) -> None:
         from teslabar.crypto.credential_store import load_credentials, save_credentials
