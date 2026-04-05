@@ -52,6 +52,7 @@ class ScheduleEntry:
     latitude: float = 0.0
     longitude: float = 0.0
     time_minutes: int = 0  # minutes after midnight
+    one_time: bool = False
 
     @property
     def time_str(self) -> str:
@@ -555,6 +556,7 @@ class TeslaService:
                         latitude=s.get("latitude", 0.0),
                         longitude=s.get("longitude", 0.0),
                         time_minutes=s.get("precondition_time", 0),
+                        one_time=s.get("one_time", False),
                     )
                 )
             return entries
@@ -572,6 +574,18 @@ class TeslaService:
             lat=0.0,
             lon=0.0,
             precondition_time=time_minutes,
+        )
+
+    async def toggle_precondition_schedule(self, entry: "ScheduleEntry", enabled: bool) -> bool:
+        return await self._send_command(
+            "add_precondition_schedule",
+            id=entry.id,
+            days_of_week=entry.days_of_week,
+            enabled=enabled,
+            lat=entry.latitude,
+            lon=entry.longitude,
+            precondition_time=entry.time_minutes,
+            one_time=entry.one_time,
         )
 
     async def remove_precondition_schedule(self, schedule_id: int) -> bool:

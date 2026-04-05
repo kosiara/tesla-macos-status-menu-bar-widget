@@ -105,6 +105,61 @@ class ScheduleListWindow(QWidget):
 class PreconditionListWindow(ScheduleListWindow):
     def __init__(self, tesla_service: TeslaService, parent=None) -> None:
         super().__init__("Precondition Schedules", tesla_service, parent)
+        self._entries: list[ScheduleEntry] = []
+
+    def populate(self, entries: list[ScheduleEntry]) -> None:
+        self._entries = entries
+        # Clear existing
+        while self._scroll_layout.count():
+            item = self._scroll_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if not entries:
+            self._empty_label = QLabel("No schedules found.")
+            self._empty_label.setStyleSheet("color: gray;")
+            self._scroll_layout.addWidget(self._empty_label)
+            return
+
+        for entry in entries:
+            frame = QFrame()
+            frame.setFrameShape(QFrame.Shape.StyledPanel)
+            fl = QHBoxLayout(frame)
+
+            enabled_cb = QCheckBox()
+            enabled_cb.setChecked(entry.enabled)
+            enabled_cb.toggled.connect(
+                lambda checked, e=entry: self._on_toggle_enabled(e, checked)
+            )
+            fl.addWidget(enabled_cb)
+
+            info_text = (
+                f"<b>{entry.time_str}</b> — "
+                f"{', '.join(entry.days_list) or 'No days'}"
+            )
+            if entry.name:
+                info_text = f"{entry.name}: {info_text}"
+            fl.addWidget(QLabel(info_text))
+            fl.addStretch()
+
+            del_btn = QPushButton("🗑")
+            del_btn.setFixedWidth(40)
+            del_btn.setToolTip("Delete this schedule")
+            del_btn.clicked.connect(
+                lambda checked=False, eid=entry.id: self._on_delete(eid)
+            )
+            fl.addWidget(del_btn)
+
+            self._scroll_layout.addWidget(frame)
+
+    def _on_toggle_enabled(self, entry: ScheduleEntry, enabled: bool) -> None:
+        asyncio.ensure_future(self._do_toggle_enabled(entry, enabled))
+
+    async def _do_toggle_enabled(self, entry: ScheduleEntry, enabled: bool) -> None:
+        success = await self._tesla.toggle_precondition_schedule(entry, enabled)
+        if success:
+            entries = await self._tesla.get_precondition_schedules()
+            self.populate(entries)
 
     def _on_delete(self, schedule_id: int) -> None:
         confirm = QMessageBox.question(
