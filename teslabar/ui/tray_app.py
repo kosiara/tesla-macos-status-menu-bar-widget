@@ -33,6 +33,7 @@ from teslabar.ui.schedule_window import (
     ChargingListWindow,
 )
 from teslabar.ui.preconditioning_set_schedule_window import PreconditionSetWindow
+from teslabar.ui.tray_app_preheating import PreheatingSection
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +144,12 @@ class TeslaBarTray:
 
         menu.addSeparator()
 
-        # 9. Charge level limit
+        # 9. Preheating
+        self._preheating = PreheatingSection(menu, self._tesla)
+        menu.addAction(self._preheating.widget_action)
+        menu.addSeparator()
+
+        # 10. Charge level limit
         self._charge_limit_action = QAction("Charge Limit: --%", menu)
         self._charge_limit_action.triggered.connect(self._open_charge_limit)
         menu.addAction(self._charge_limit_action)
@@ -291,6 +297,9 @@ class TeslaBarTray:
         self._sentry_action.setText(
             f"Sentry: {'On' if vd.sentry_mode else 'Off'}"
         )
+
+        # Preheating
+        self._preheating.update(vd.is_preconditioning, enabled)
 
         # Charge limit
         self._charge_limit_action.setText(f"Charge Limit: {vd.charge_limit}%")
