@@ -153,44 +153,51 @@ class MainWindow(QWidget):
         asyncio.ensure_future(self._do_refresh_location())
 
     async def _do_refresh_location(self) -> None:
+        lat, lon = None, None
         try:
             vehicle = await self._tesla._ensure_vehicle()
+
+            # Try drive_state first
             logger.info("Fetching location via vehicle_data(endpoints=['drive_state'])")
             resp = await vehicle.vehicle_data(endpoints=["drive_state"])
-            logger.info("Location API response: %s", resp)
+            logger.info("drive_state response: %s", resp)
             data = resp.get("response", {})
             drive = data.get("drive_state", {})
             lat = drive.get("latitude")
             lon = drive.get("longitude")
+
+            # Fall back to location_data if drive_state had no coordinates
+            if lat is None or lon is None:
+                try:
+                    logger.info("drive_state had no coordinates, trying location_data")
+                    resp2 = await vehicle.vehicle_data(endpoints=["location_data"])
+                    logger.info("location_data response: %s", resp2)
+                    data2 = resp2.get("response", {})
+                    loc = data2.get("location_data", {})
+                    lat = loc.get("latitude")
+                    lon = loc.get("longitude")
+                except BaseException as e2:
+                    logger.warning("location_data endpoint failed: %s", e2)
+
             if lat is not None and lon is not None:
-                self._tesla._update_location(data)
-                self._lat_label.setText(f"Latitude: {lat:.6f}")
-                self._lon_label.setText(f"Longitude: {lon:.6f}")
-                self._location_status_label.setText("Location fetched successfully.")
+                self._tesla._update_location({"drive_state": {"latitude": lat, "longitude": lon}})
+                self._lat_input.setText(str(lat))
+                self._lon_input.setText(str(lon))
+                self._location_status_label.setText("Location fetched — press Save to store it.")
                 self._location_status_label.setStyleSheet("color: green;")
-                import time
                 from datetime import datetime
-                self._location_updated_label.setText(
+                self._location_save_label.setText(
                     f"Updated: {datetime.now().strftime('%H:%M:%S')}"
                 )
             else:
                 self._location_status_label.setText(
-                    "Location not available (vehicle may be asleep)."
+                    "Could not fetch location. Enter coordinates manually."
                 )
                 self._location_status_label.setStyleSheet("color: orange;")
-                # Show saved location if available
-                vd = self._tesla.vehicle_data
-                if vd.latitude and vd.longitude:
-                    self._lat_label.setText(f"Latitude: {vd.latitude:.6f} (saved)")
-                    self._lon_label.setText(f"Longitude: {vd.longitude:.6f} (saved)")
         except BaseException as e:
+            logger.error("Location fetch error: %s", e)
             self._location_status_label.setText(f"Error: {e}")
             self._location_status_label.setStyleSheet("color: red;")
-            # Show saved location as fallback
-            vd = self._tesla.vehicle_data
-            if vd.latitude and vd.longitude:
-                self._lat_label.setText(f"Latitude: {vd.latitude:.6f} (saved)")
-                self._lon_label.setText(f"Longitude: {vd.longitude:.6f} (saved)")
 
     def _on_refresh(self) -> None:
         asyncio.ensure_future(self._do_refresh())
