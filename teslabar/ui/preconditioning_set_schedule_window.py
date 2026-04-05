@@ -42,7 +42,9 @@ class PreconditionSetWindow(QWidget):
         tl = QHBoxLayout(time_group)
         self._time_edit = QTimeEdit()
         self._time_edit.setDisplayFormat("HH:mm")
-        self._time_edit.setTime(QTime(7, 0))
+        now = datetime.now()
+        default_time = now.hour * 60 + now.minute + 20
+        self._time_edit.setTime(QTime(default_time // 60 % 24, default_time % 60))
         tl.addWidget(self._time_edit)
         layout.addWidget(time_group)
 
@@ -58,6 +60,11 @@ class PreconditionSetWindow(QWidget):
             self._day_checks.append(cb)
             dl.addWidget(cb)
         layout.addWidget(day_group)
+
+        # Repeat weekly
+        self._repeat_cb = QCheckBox("Repeat weekly")
+        self._repeat_cb.setChecked(False)
+        layout.addWidget(self._repeat_cb)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -83,11 +90,12 @@ class PreconditionSetWindow(QWidget):
         t = self._time_edit.time()
         time_minutes = t.hour() * 60 + t.minute()
 
-        asyncio.ensure_future(self._do_set(days_of_week, time_minutes))
+        one_time = not self._repeat_cb.isChecked()
+        asyncio.ensure_future(self._do_set(days_of_week, time_minutes, one_time))
 
-    async def _do_set(self, days_of_week: int, time_minutes: int) -> None:
+    async def _do_set(self, days_of_week: int, time_minutes: int, one_time: bool) -> None:
         success = await self._tesla.add_precondition_schedule(
-            days_of_week, time_minutes
+            days_of_week, time_minutes, one_time
         )
         if success:
             QMessageBox.information(self, "Success", "Precondition schedule set.")

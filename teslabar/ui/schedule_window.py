@@ -1,7 +1,6 @@
 """Schedule windows for precondition and charging schedules."""
 
 import asyncio
-from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -12,11 +11,9 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QFrame,
     QCheckBox,
-    QTimeEdit,
-    QGroupBox,
     QMessageBox,
 )
-from PySide6.QtCore import Qt, QTime
+from PySide6.QtCore import Qt
 
 from teslabar.services.tesla_api import TeslaService, ScheduleEntry
 

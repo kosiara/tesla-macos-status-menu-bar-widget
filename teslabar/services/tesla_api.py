@@ -565,7 +565,7 @@ class TeslaService:
             return []
 
     async def add_precondition_schedule(
-        self, days_of_week: int, time_minutes: int
+        self, days_of_week: int, time_minutes: int, one_time: bool = False
     ) -> bool:
         return await self._send_command(
             "add_precondition_schedule",
@@ -574,6 +574,7 @@ class TeslaService:
             lat=0.0,
             lon=0.0,
             precondition_time=time_minutes,
+            one_time=one_time,
         )
 
     async def toggle_precondition_schedule(self, entry: "ScheduleEntry", enabled: bool) -> bool:
