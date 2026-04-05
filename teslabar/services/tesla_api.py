@@ -607,14 +607,40 @@ class TeslaService:
             logger.error("Failed to get precondition schedules: %s", e)
             return []
 
+    async def _get_location(self) -> tuple[float, float]:
+        """Get location: saved/vehicle first, then IP geolocation fallback."""
+        lat = self.vehicle_data.latitude
+        lon = self.vehicle_data.longitude
+        if lat and lon:
+            logger.info("Using vehicle/saved location: %.6f, %.6f", lat, lon)
+            return lat, lon
+        # Fallback: IP-based geolocation
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://ipinfo.io/json", timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    data = await resp.json()
+                    loc = data.get("loc", "")
+                    if "," in loc:
+                        ip_lat, ip_lon = loc.split(",")
+                        lat, lon = float(ip_lat), float(ip_lon)
+                        logger.info("Using IP geolocation fallback: %.6f, %.6f", lat, lon)
+                        return lat, lon
+        except Exception as e:
+            logger.warning("IP geolocation failed: %s", e)
+        logger.warning("No location available, using 0.0, 0.0")
+        return 0.0, 0.0
+
     async def add_precondition_schedule(
         self, days_of_week: int, time_minutes: int, one_time: bool = False
     ) -> bool:
-        lat = self.vehicle_data.latitude or 0.0
-        lon = self.vehicle_data.longitude or 0.0
-        logger.info("Adding precondition schedule at location: %.6f, %.6f", lat, lon)
+        lat, lon = await self._get_location()
+        schedule_id = int(time.time())
+        logger.info("Adding precondition schedule id=%d at location: %.6f, %.6f", schedule_id, lat, lon)
         return await self._send_command(
             "add_precondition_schedule",
+            id=schedule_id,
             days_of_week=days_of_week,
             enabled=True,
             lat=lat,
