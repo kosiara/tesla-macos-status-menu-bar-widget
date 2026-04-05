@@ -209,6 +209,7 @@ class TeslaService:
             f"&state={quote(state, safe='')}"
             f"&audience={quote(audience, safe='')}"
             f"&prompt=consent"
+            f"&prompt_missing_scopes=true"
         )
 
     async def exchange_code(self, code: str, redirect_uri: str) -> dict:
