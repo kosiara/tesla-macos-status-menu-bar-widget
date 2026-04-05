@@ -33,7 +33,7 @@ class ScheduleListWindow(QWidget):
         super().__init__(parent)
         self._tesla = tesla_service
         self.setWindowTitle(title)
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(800)
         self.setMinimumHeight(300)
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint

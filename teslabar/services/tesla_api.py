@@ -506,9 +506,10 @@ class TeslaService:
                 endpoints=["charge_schedule_data"]
             )
             data = resp.get("response", {})
+            logger.info("Charge schedule data: %s", data.get("charge_schedule_data"))
             schedules_raw = (
                 data.get("charge_schedule_data", {})
-                .get("charge_schedule", [])
+                .get("charge_schedules", [])
             )
             entries = []
             for s in schedules_raw:
@@ -524,7 +525,7 @@ class TeslaService:
                     )
                 )
             return entries
-        except Exception as e:
+        except BaseException as e:
             logger.error("Failed to get charge schedules: %s", e)
             return []
 
@@ -538,9 +539,10 @@ class TeslaService:
                 endpoints=["preconditioning_schedule_data"]
             )
             data = resp.get("response", {})
+            logger.info("Precondition schedule data: %s", data.get("preconditioning_schedule_data"))
             schedules_raw = (
                 data.get("preconditioning_schedule_data", {})
-                .get("precondition_schedule", [])
+                .get("precondition_schedules", [])
             )
             entries = []
             for s in schedules_raw:
@@ -556,7 +558,7 @@ class TeslaService:
                     )
                 )
             return entries
-        except Exception as e:
+        except BaseException as e:
             logger.error("Failed to get precondition schedules: %s", e)
             return []
 
