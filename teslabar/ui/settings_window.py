@@ -1,6 +1,7 @@
 """Settings window for TeslaBar configuration."""
 
 import io
+import logging
 import webbrowser
 
 from PySide6.QtWidgets import (
@@ -29,6 +30,7 @@ from teslabar.crypto.virtual_key import (
     get_github_pages_instructions,
 )
 
+logger = logging.getLogger(__name__)
 
 class SettingsWindow(QWidget):
     def __init__(self, tesla_service, password: str, parent=None) -> None:
@@ -311,6 +313,7 @@ class SettingsWindow(QWidget):
             self._tesla._access_token = ""
             self._tesla._refresh_token = ""
             self._tesla._token_expiry = 0.0
+        logger.info("OAuth token was cleared.")
         QMessageBox.information(self, "Token Cleared", "Access token cleared. Re-authenticate to get a new one.")
 
     def _on_generate_key(self) -> None:

@@ -218,8 +218,20 @@ class TeslaService:
                 self._refresh_token = data.get("refresh_token", "")
                 expires_in = data.get("expires_in", 28800)
                 self._token_expiry = time.time() + expires_in
-                granted_scopes = data.get("scope", "N/A")
-                logger.info("OAuth token granted scopes: %s", granted_scopes)
+                granted_scopes = data.get("scope", "")
+                if granted_scopes:
+                    logger.info("OAuth token granted scopes: %s", granted_scopes)
+                else:
+                    # Decode scopes from JWT payload
+                    try:
+                        import base64, json as _json
+                        payload = self._access_token.split(".")[1]
+                        payload += "=" * (-len(payload) % 4)
+                        claims = _json.loads(base64.urlsafe_b64decode(payload))
+                        jwt_scopes = claims.get("scp", claims.get("scope", "N/A"))
+                        logger.info("OAuth token scopes (from JWT): %s", jwt_scopes)
+                    except Exception:
+                        logger.info("OAuth token scopes: not available")
                 # Reset API so it picks up new token
                 self._api = None
                 self._vehicle = None
