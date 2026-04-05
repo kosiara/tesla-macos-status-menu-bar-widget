@@ -218,6 +218,8 @@ class TeslaService:
                 self._refresh_token = data.get("refresh_token", "")
                 expires_in = data.get("expires_in", 28800)
                 self._token_expiry = time.time() + expires_in
+                granted_scopes = data.get("scope", "N/A")
+                logger.info("OAuth token granted scopes: %s", granted_scopes)
                 # Reset API so it picks up new token
                 self._api = None
                 self._vehicle = None
