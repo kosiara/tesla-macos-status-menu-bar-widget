@@ -173,6 +173,14 @@ class SettingsWindow(QWidget):
         gen_btn.clicked.connect(self._on_generate_key)
         vk_layout.addWidget(gen_btn)
 
+        export_btn = QPushButton("Export Key Pair to a file")
+        export_btn.clicked.connect(self._on_export_key_pair)
+        vk_layout.addWidget(export_btn)
+
+        import_btn = QPushButton("Import Key Pair from a file")
+        import_btn.clicked.connect(self._on_import_key_pair)
+        vk_layout.addWidget(import_btn)
+
         # GitHub Pages domain
         domain_layout = QFormLayout()
         self._domain_input = QLineEdit(
@@ -325,6 +333,76 @@ class SettingsWindow(QWidget):
             "Public key saved. See instructions for Tesla registration.",
         )
         self._build_ui()
+
+    def _on_export_key_pair(self) -> None:
+        from teslabar.crypto.virtual_key import get_private_key_pem, get_public_key_pem
+        from PySide6.QtWidgets import QFileDialog
+        from pathlib import Path
+
+        priv = get_private_key_pem()
+        pub = get_public_key_pem()
+        if not priv or not pub:
+            QMessageBox.warning(self, "Export", "No key pair found. Generate one first.")
+            return
+
+        downloads = str(Path.home() / "Downloads" / "tesla_widget_key_pair.key")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Key Pair", downloads, "Key Files (*.key);;All Files (*)"
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, "w") as f:
+                f.write(priv)
+                if not priv.endswith("\n"):
+                    f.write("\n")
+                f.write(pub)
+            QMessageBox.information(self, "Export", f"Key pair exported to:\n{path}")
+        except Exception as e:
+            QMessageBox.warning(self, "Export", f"Failed to export: {e}")
+
+    def _on_import_key_pair(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        from pathlib import Path
+        from teslabar.config import VIRTUAL_KEY_FILE, VIRTUAL_PUB_KEY_FILE
+        import platform
+
+        downloads = str(Path.home() / "Downloads")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import Key Pair", downloads, "Key Files (*.key);;All Files (*)"
+        )
+        if not path:
+            return
+
+        try:
+            content = open(path).read()
+            # Split into private and public key
+            parts = content.split("-----END PRIVATE KEY-----")
+            if len(parts) < 2 or "-----BEGIN PRIVATE KEY-----" not in parts[0]:
+                QMessageBox.warning(self, "Import", "Invalid key file. Expected private + public key in PEM format.")
+                return
+            priv_pem = parts[0] + "-----END PRIVATE KEY-----\n"
+            pub_pem = parts[1].strip()
+            if "-----BEGIN PUBLIC KEY-----" not in pub_pem:
+                QMessageBox.warning(self, "Import", "Invalid key file. Public key not found.")
+                return
+
+            VIRTUAL_KEY_FILE.write_text(priv_pem)
+            VIRTUAL_PUB_KEY_FILE.write_text(pub_pem)
+
+            # Store in keychain on macOS
+            if platform.system() == "Darwin":
+                try:
+                    import keyring
+                    keyring.set_password("com.teslabar.virtualkey", "private_key", priv_pem)
+                except Exception:
+                    pass
+
+            QMessageBox.information(self, "Import", "Key pair imported successfully.")
+            self._build_ui()
+        except Exception as e:
+            QMessageBox.warning(self, "Import", f"Failed to import: {e}")
 
     def _on_show_instructions(self) -> None:
         domain = self._domain_input.text().strip()
