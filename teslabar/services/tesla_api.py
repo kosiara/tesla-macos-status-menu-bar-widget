@@ -663,6 +663,18 @@ class TeslaService:
             one_time=entry.one_time,
         )
 
+    async def nearby_charging_sites(self, radius: int = 200, count: int = 50) -> list[dict]:
+        """Return nearby superchargers within radius (km)."""
+        try:
+            vehicle = await self._ensure_vehicle()
+            resp = await vehicle.nearby_charging_sites(count=count, radius=radius, detail=True)
+            logger.info("Nearby charging sites response: %s", resp)
+            sites = resp.get("response", {}).get("superchargers", [])
+            return sites
+        except BaseException as e:
+            logger.error("Failed to get nearby charging sites: %s", e)
+            return []
+
     async def remove_precondition_schedule(self, schedule_id: int) -> bool:
         return await self._send_command(
             "remove_precondition_schedule", id=schedule_id

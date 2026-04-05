@@ -30,7 +30,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("TeslaBar")
         self.setMinimumWidth(500)
-        self.setMinimumHeight(450)
+        self.setMinimumHeight(600)
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
         )

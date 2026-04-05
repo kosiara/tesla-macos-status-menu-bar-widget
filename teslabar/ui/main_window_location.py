@@ -29,6 +29,7 @@ class LocationTab(QWidget):
     def __init__(self, tesla_service: TeslaService, parent=None) -> None:
         super().__init__(parent)
         self._tesla = tesla_service
+        self._superchargers: list[dict] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -74,6 +75,15 @@ class LocationTab(QWidget):
         self._location_save_label.setStyleSheet("color: gray; font-size: 12px;")
         layout.addWidget(self._location_save_label)
 
+        # Supercharger button
+        self._supercharger_btn = QPushButton("Find nearest Superchargers")
+        self._supercharger_btn.clicked.connect(self._on_find_superchargers)
+        layout.addWidget(self._supercharger_btn)
+
+        self._supercharger_status_label = QLabel("")
+        self._supercharger_status_label.setStyleSheet("color: gray; font-size: 12px;")
+        layout.addWidget(self._supercharger_status_label)
+
         # Map view
         self._map_view = QWebEngineView()
         self._map_view.setMinimumHeight(300)
@@ -103,15 +113,44 @@ class LocationTab(QWidget):
     def _update_map(self, lat: float | None = None, lon: float | None = None) -> None:
         if lat is None or lon is None:
             lat, lon = self._get_input_coords()
-        if lat is not None and lon is not None:
-            m = folium.Map(location=[lat, lon], zoom_start=15)
+        has_coords = lat is not None and lon is not None
+        zoom = 15 if has_coords and not self._superchargers else DEFAULT_ZOOM
+        if has_coords and self._superchargers:
+            zoom = 9
+        center = [lat, lon] if has_coords else [DEFAULT_LAT, DEFAULT_LON]
+        m = folium.Map(location=center, zoom_start=zoom)
+
+        # Vehicle marker (blue)
+        if has_coords:
             folium.Marker(
                 [lat, lon],
                 popup=f"Vehicle: {lat:.6f}, {lon:.6f}",
                 tooltip="Vehicle location",
+                icon=folium.Icon(color="blue", icon="car", prefix="fa"),
             ).add_to(m)
-        else:
-            m = folium.Map(location=[DEFAULT_LAT, DEFAULT_LON], zoom_start=DEFAULT_ZOOM)
+
+        # Supercharger markers (red)
+        for sc in self._superchargers:
+            sc_lat = sc.get("location", {}).get("lat")
+            sc_lon = sc.get("location", {}).get("long")
+            if sc_lat is None or sc_lon is None:
+                continue
+            name = sc.get("name", "Supercharger")
+            stalls = sc.get("available_stalls", "?")
+            total = sc.get("total_stalls", "?")
+            dist_km = sc.get("distance_miles", 0) * 1.60934
+            popup_text = (
+                f"<b>{name}</b><br>"
+                f"Stalls: {stalls}/{total}<br>"
+                f"Distance: {dist_km:.1f} km"
+            )
+            folium.Marker(
+                [sc_lat, sc_lon],
+                popup=folium.Popup(popup_text, max_width=250),
+                tooltip=name,
+                icon=folium.Icon(color="red", icon="bolt", prefix="fa"),
+            ).add_to(m)
+
         self._map_view.setHtml(m._repr_html_())
 
     def _on_save_location(self) -> None:
@@ -189,3 +228,25 @@ class LocationTab(QWidget):
             logger.error("Location fetch error: %s", e)
             self._location_status_label.setText(f"Error: {e}")
             self._location_status_label.setStyleSheet("color: red;")
+
+    def _on_find_superchargers(self) -> None:
+        self._supercharger_status_label.setText("Searching for nearby Superchargers...")
+        self._supercharger_status_label.setStyleSheet("color: #0066cc; font-size: 12px;")
+        asyncio.ensure_future(self._do_find_superchargers())
+
+    async def _do_find_superchargers(self) -> None:
+        try:
+            sites = await self._tesla.nearby_charging_sites(radius=200)
+            self._superchargers = sites
+            count = len(sites)
+            if count:
+                self._supercharger_status_label.setText(f"Found {count} Supercharger(s).")
+                self._supercharger_status_label.setStyleSheet("color: green; font-size: 12px;")
+            else:
+                self._supercharger_status_label.setText("No Superchargers found nearby.")
+                self._supercharger_status_label.setStyleSheet("color: orange; font-size: 12px;")
+            self._update_map()
+        except BaseException as e:
+            logger.error("Supercharger search error: %s", e)
+            self._supercharger_status_label.setText(f"Error: {e}")
+            self._supercharger_status_label.setStyleSheet("color: red; font-size: 12px;")
