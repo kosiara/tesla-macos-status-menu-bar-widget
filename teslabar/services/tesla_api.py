@@ -189,7 +189,7 @@ class TeslaService:
             "vehicle_cmds",
             "vehicle_charging_cmds",
         ]
-        scope_str = "%20".join(scopes)
+        logger.info(f"Getting oauth url for scopes {quote(' '.join(scopes), safe='')}")
         return (
             f"https://auth.tesla.com/oauth2/v3/authorize"
             f"?client_id={quote(self._client_id, safe='')}"
