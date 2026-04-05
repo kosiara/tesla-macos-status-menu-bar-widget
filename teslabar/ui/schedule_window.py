@@ -55,9 +55,19 @@ class ScheduleListWindow(QWidget):
         self._empty_label.setStyleSheet("color: gray;")
         self._scroll_layout.addWidget(self._empty_label)
 
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        refresh_btn = QPushButton("⟳")
+        refresh_btn.setFixedWidth(40)
+        refresh_btn.setToolTip("Refresh")
+        refresh_btn.setStyleSheet("font-size: 18px;")
+        refresh_btn.clicked.connect(self._on_refresh)
+        btn_layout.addWidget(refresh_btn)
         close_btn = QPushButton("Close")
+        close_btn.setStyleSheet("font-size: 18px;")
         close_btn.clicked.connect(self.close)
-        layout.addWidget(close_btn, alignment=Qt.AlignRight)
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
 
     def populate(self, entries: list[ScheduleEntry]) -> None:
         # Clear existing
@@ -78,7 +88,7 @@ class ScheduleListWindow(QWidget):
             fl = QHBoxLayout(frame)
 
             info_text = (
-                f"<b>{entry.time_str}</b> — "
+                f"    <b>{entry.time_str}</b> — "
                 f"{', '.join(entry.days_list) or 'No days'}"
             )
             if entry.name:
@@ -97,6 +107,9 @@ class ScheduleListWindow(QWidget):
             fl.addWidget(del_btn)
 
             self._scroll_layout.addWidget(frame)
+
+    def _on_refresh(self) -> None:
+        raise NotImplementedError
 
     def _on_delete(self, schedule_id: int) -> None:
         raise NotImplementedError
@@ -152,6 +165,13 @@ class PreconditionListWindow(ScheduleListWindow):
 
             self._scroll_layout.addWidget(frame)
 
+    def _on_refresh(self) -> None:
+        asyncio.ensure_future(self._do_refresh())
+
+    async def _do_refresh(self) -> None:
+        entries = await self._tesla.get_precondition_schedules()
+        self.populate(entries)
+
     def _on_toggle_enabled(self, entry: ScheduleEntry, enabled: bool) -> None:
         asyncio.ensure_future(self._do_toggle_enabled(entry, enabled))
 
@@ -182,6 +202,13 @@ class PreconditionListWindow(ScheduleListWindow):
 class ChargingListWindow(ScheduleListWindow):
     def __init__(self, tesla_service: TeslaService, parent=None) -> None:
         super().__init__("Charging Schedules", tesla_service, parent)
+
+    def _on_refresh(self) -> None:
+        asyncio.ensure_future(self._do_refresh())
+
+    async def _do_refresh(self) -> None:
+        entries = await self._tesla.get_charge_schedules()
+        self.populate(entries)
 
     def _on_delete(self, schedule_id: int) -> None:
         confirm = QMessageBox.question(
