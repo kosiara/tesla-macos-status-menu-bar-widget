@@ -432,7 +432,7 @@ class TeslaBarTray:
             # Discover vehicle
             await self._tesla.discover_vehicle()
             self._update_menu()
-        except Exception as e:
+        except BaseException as e:
             logger.error("OAuth completion failed: %s", e)
             self._status_action.setText(f"Status: Auth error - {e}")
 

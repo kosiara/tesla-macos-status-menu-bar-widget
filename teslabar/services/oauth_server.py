@@ -63,8 +63,9 @@ def stop_callback_server() -> None:
     global _server
     logger.info("OAuth callback server shutting down....")
     if _server:
-        _server.shutdown()
+        server = _server
         _server = None
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
 
 def get_callback_result() -> dict | None:
