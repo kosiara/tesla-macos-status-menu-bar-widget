@@ -8,13 +8,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QFormLayout,
-    QGroupBox,
     QLabel,
     QLineEdit,
     QSpinBox,
     QComboBox,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QTextEdit,
     QMessageBox,
 )
@@ -38,7 +38,7 @@ class SettingsWindow(QWidget):
 
         self.setWindowTitle("TeslaBar - Settings")
         self.setMinimumWidth(520)
-        self.setMinimumHeight(900)
+        self.setMinimumHeight(600)
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowStaysOnTopHint
         )
@@ -49,9 +49,26 @@ class SettingsWindow(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        # OAuth section
-        oauth_group = QGroupBox("OAuth Credentials")
-        oauth_layout = QFormLayout(oauth_group)
+        tabs = QTabWidget()
+        tabs.addTab(self._build_oauth_tab(), "OAuth Credentials")
+        tabs.addTab(self._build_general_tab(), "General")
+        tabs.addTab(self._build_virtual_key_tab(), "Virtual Key")
+        layout.addWidget(tabs)
+
+        # Save / Close
+        btn_layout = QHBoxLayout()
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(self._on_save)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        btn_layout.addWidget(save_btn)
+        layout.addLayout(btn_layout)
+
+    def _build_oauth_tab(self) -> QWidget:
+        tab = QWidget()
+        oauth_layout = QFormLayout(tab)
 
         self._client_id_input = QLineEdit(
             self._tesla._client_id if self._tesla else ""
@@ -72,11 +89,11 @@ class SettingsWindow(QWidget):
         self._clear_token_btn.clicked.connect(self._on_clear_token)
         oauth_layout.addRow(self._clear_token_btn)
 
-        layout.addWidget(oauth_group)
+        return tab
 
-        # General settings
-        general_group = QGroupBox("General")
-        general_layout = QFormLayout(general_group)
+    def _build_general_tab(self) -> QWidget:
+        tab = QWidget()
+        general_layout = QFormLayout(tab)
 
         self._refresh_spin = QSpinBox()
         self._refresh_spin.setRange(5, 300)
@@ -98,11 +115,11 @@ class SettingsWindow(QWidget):
             self._region_combo.setCurrentIndex(idx)
         general_layout.addRow("Tesla API region:", self._region_combo)
 
-        layout.addWidget(general_group)
+        return tab
 
-        # Virtual Key section
-        vk_group = QGroupBox("Virtual Key")
-        vk_layout = QVBoxLayout(vk_group)
+    def _build_virtual_key_tab(self) -> QWidget:
+        tab = QWidget()
+        vk_layout = QVBoxLayout(tab)
 
         if not (self._tesla and self._tesla.partner_registered):
             setup_info = QLabel(
@@ -164,7 +181,7 @@ class SettingsWindow(QWidget):
         vk_layout.addWidget(self._show_instructions_btn)
 
         self._qr_label = QLabel()
-        self._qr_label.setAlignment(Qt.AlignCenter)
+        self._qr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         vk_layout.addWidget(self._qr_label)
 
         self._show_qr_btn = QPushButton("Show QR Code for Key URL")
@@ -181,18 +198,7 @@ class SettingsWindow(QWidget):
             self._ak_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
             vk_layout.addWidget(self._ak_link)
 
-        layout.addWidget(vk_group)
-
-        # Save / Close
-        btn_layout = QHBoxLayout()
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self._on_save)
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(self.close)
-        btn_layout.addStretch()
-        btn_layout.addWidget(close_btn)
-        btn_layout.addWidget(save_btn)
-        layout.addLayout(btn_layout)
+        return tab
 
     def _on_save(self) -> None:
         self._cfg["refresh_interval_seconds"] = self._refresh_spin.value()
