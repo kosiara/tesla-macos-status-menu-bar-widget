@@ -15,6 +15,7 @@ from teslabar.config import load_config, save_config
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
 from tesla_fleet_api.tesla.vehicle.signed import VehicleSigned
+from tesla_fleet_api.const import Method
 from tesla_fleet_api.exceptions import TeslaFleetError, VehicleOffline
 
 logger = logging.getLogger(__name__)
@@ -663,12 +664,22 @@ class TeslaService:
             one_time=entry.one_time,
         )
 
-    async def nearby_charging_sites(self, radius: int = 200, count: int = 50) -> list[dict]:
-        """Return nearby superchargers within radius (km)."""
+    async def nearby_charging_sites(self, radius: int = 300, count: int = 50) -> list[dict]:
+        """Return nearby superchargers within radius (miles). Uses REST API directly."""
         try:
-            vehicle = await self._ensure_vehicle()
-            resp = await vehicle.nearby_charging_sites(count=count, radius=radius, detail=True)
-            logger.info("Nearby charging sites response: %s", resp)
+            await self._ensure_api()
+            if not self._vin:
+                return []
+            # Use the fleet REST endpoint directly, not the signed command
+            resp = await self._api._request(
+                Method.GET,
+                f"api/1/vehicles/{self._vin}/nearby_charging_sites",
+                {"count": count, "radius": radius, "detail": True},
+            )
+            logger.info("Nearby charging sites response keys: %s", list(resp.get("response", {}).keys()))
+            logger.info("Nearby charging sites count: superchargers=%d, destination=%d",
+                        len(resp.get("response", {}).get("superchargers", [])),
+                        len(resp.get("response", {}).get("destination_charging", [])))
             sites = resp.get("response", {}).get("superchargers", [])
             return sites
         except BaseException as e:

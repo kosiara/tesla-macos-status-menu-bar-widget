@@ -236,7 +236,7 @@ class LocationTab(QWidget):
 
     async def _do_find_superchargers(self) -> None:
         try:
-            sites = await self._tesla.nearby_charging_sites(radius=200)
+            sites = await self._tesla.nearby_charging_sites(radius=250)
             self._superchargers = sites
             count = len(sites)
             if count:
