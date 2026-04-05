@@ -208,6 +208,7 @@ class TeslaService:
             f"&scope={quote(' '.join(scopes), safe='')}"
             f"&state={quote(state, safe='')}"
             f"&audience={quote(audience, safe='')}"
+            f"&prompt=consent"
         )
 
     async def exchange_code(self, code: str, redirect_uri: str) -> dict:
