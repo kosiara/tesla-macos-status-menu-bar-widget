@@ -50,10 +50,23 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         logger.debug(format, *args)
 
 
+class _ReusableHTTPServer(HTTPServer):
+    allow_reuse_address = True
+
+
 def start_callback_server(port: int = 8457) -> None:
     global _server, _callback_result
+    # Stop any lingering server first
+    if _server:
+        logger.info("Stopping previous OAuth callback server before starting new one")
+        try:
+            _server.shutdown()
+            _server.server_close()
+        except Exception:
+            pass
+        _server = None
     _callback_result = None
-    _server = HTTPServer(("127.0.0.1", port), OAuthCallbackHandler)
+    _server = _ReusableHTTPServer(("127.0.0.1", port), OAuthCallbackHandler)
     thread = threading.Thread(target=_server.serve_forever, daemon=True)
     thread.start()
     logger.info("OAuth callback server started on port %d", port)

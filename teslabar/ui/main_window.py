@@ -1,6 +1,7 @@
 """Main window mode - shows all menu bar info with auto-refresh."""
 
 import asyncio
+import logging
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -16,6 +17,8 @@ from PySide6.QtCore import Qt, QTimer
 
 from teslabar.config import load_config
 from teslabar.services.tesla_api import TeslaService, VehicleState
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QWidget):
@@ -152,7 +155,9 @@ class MainWindow(QWidget):
     async def _do_refresh_location(self) -> None:
         try:
             vehicle = await self._tesla._ensure_vehicle()
+            logger.info("Fetching location via vehicle_data(endpoints=['drive_state'])")
             resp = await vehicle.vehicle_data(endpoints=["drive_state"])
+            logger.info("Location API response: %s", resp)
             data = resp.get("response", {})
             drive = data.get("drive_state", {})
             lat = drive.get("latitude")

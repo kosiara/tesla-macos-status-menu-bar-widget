@@ -196,8 +196,10 @@ class TeslaService:
             "vehicle_device_data",
             "vehicle_cmds",
             "vehicle_charging_cmds",
+            "vehicle_location",
         ]
-        logger.info(f"Getting oauth url for scopes {quote(' '.join(scopes), safe='')}")
+        audience = f"https://fleet-api.prd.{self._region}.vn.cloud.tesla.com"
+        logger.info(f"Getting oauth url for scopes {quote(' '.join(scopes), safe='')} audience={audience}")
         return (
             f"https://auth.tesla.com/oauth2/v3/authorize"
             f"?client_id={quote(self._client_id, safe='')}"
@@ -205,6 +207,7 @@ class TeslaService:
             f"&response_type=code"
             f"&scope={quote(' '.join(scopes), safe='')}"
             f"&state={quote(state, safe='')}"
+            f"&audience={quote(audience, safe='')}"
         )
 
     async def exchange_code(self, code: str, redirect_uri: str) -> dict:
@@ -217,9 +220,13 @@ class TeslaService:
                     "client_secret": self._client_secret,
                     "code": code,
                     "redirect_uri": redirect_uri,
+                    "audience": f"https://fleet-api.prd.{self._region}.vn.cloud.tesla.com",
+                    "scope": "openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds vehicle_location",
                 },
             ) as resp:
                 data = await resp.json()
+                logger.info("Token exchange response keys: %s", list(data.keys()))
+                logger.info("Token exchange granted scope: %s", data.get("scope", "(not in response)"))
                 if "access_token" not in data:
                     raise RuntimeError(f"Token exchange failed: {data}")
                 self._access_token = data["access_token"]
