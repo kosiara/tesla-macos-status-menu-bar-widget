@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidgetAction,
     QLabel,
 )
-from PySide6.QtGui import QIcon, QAction, QPixmap
+from PySide6.QtGui import QIcon, QAction, QPixmap, Qt
 from PySide6.QtCore import QTimer
 
 from teslabar.config import load_config
@@ -122,9 +122,12 @@ class TeslaBarTray:
         menu.addAction(self._charge_toggle_action)
 
         # 5. Charger status
-        self._charger_status_action = QAction("Charger: --", menu)
-        self._charger_status_action.setEnabled(False)
-        menu.addAction(self._charger_status_action)
+        self._charger_status_label = QLabel("Charger: --")
+        self._charger_status_label.setTextFormat(Qt.TextFormat.RichText)
+        self._charger_status_label.setContentsMargins(20, 4, 20, 4)
+        charger_widget_action = QWidgetAction(menu)
+        charger_widget_action.setDefaultWidget(self._charger_status_label)
+        menu.addAction(charger_widget_action)
 
         menu.addSeparator()
 
@@ -270,7 +273,16 @@ class TeslaBarTray:
             self._charge_toggle_action.setText("Start Charge")
 
         # Charger status
-        self._charger_status_action.setText(f"Charger: {vd.charging_state}")
+        cs = vd.charging_state
+        if cs == "Charging":
+            cs_color = "green"
+        elif cs in ("Stopped", "Disconnected"):
+            cs_color = "red"
+        else:
+            cs_color = "orange"
+        self._charger_status_label.setText(
+            f"Charger: <span style='color:{cs_color}'>{cs}</span>"
+        )
 
         # Security
         self._lock_action.setText(

@@ -61,6 +61,7 @@ class MainWindow(QWidget):
         bl.addWidget(self._battery_label)
 
         self._charge_status_label = QLabel("Charger: --")
+        self._charge_status_label.setTextFormat(Qt.TextFormat.RichText)
         bl.addWidget(self._charge_status_label)
 
         self._charge_limit_label = QLabel("Charge Limit: --%")
@@ -142,7 +143,16 @@ class MainWindow(QWidget):
         self._cmd_label.setText(self._tesla.command_status)
 
         self._battery_label.setText(f"Battery: {vd.battery_level}%")
-        self._charge_status_label.setText(f"Charger: {vd.charging_state}")
+        charging_state = vd.charging_state
+        if charging_state == "Charging":
+            color = "green"
+        elif charging_state in ("Stopped", "Disconnected"):
+            color = "red"
+        else:
+            color = "orange"
+        self._charge_status_label.setText(
+            f"Charger: <span style='color:{color}'>{charging_state}</span>"
+        )
         self._charge_limit_label.setText(f"Charge Limit: {vd.charge_limit}%")
 
         self._lock_label.setText(
