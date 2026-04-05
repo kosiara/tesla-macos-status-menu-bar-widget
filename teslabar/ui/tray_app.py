@@ -34,6 +34,7 @@ from teslabar.ui.schedule_window import (
 )
 from teslabar.ui.preconditioning_set_schedule_window import PreconditionSetWindow
 from teslabar.ui.tray_app_preheating import PreheatingSection
+from teslabar.ui.cabin_temp_popup import CabinTempPopup
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class TeslaBarTray:
         self._precond_list_win: PreconditionListWindow | None = None
         self._charging_list_win: ChargingListWindow | None = None
         self._precond_set_win: PreconditionSetWindow | None = None
+        self._cabin_temp_popup: CabinTempPopup | None = None
 
         # Menu refresh state
         self._menu_is_open = False
@@ -154,7 +156,17 @@ class TeslaBarTray:
         self._charge_limit_action.triggered.connect(self._open_charge_limit)
         menu.addAction(self._charge_limit_action)
 
-        # 10. Set Precondition schedule
+        # 10a. Cabin temperature
+        self._cabin_temp_label = QLabel("Cabin Temperature: --")
+        self._cabin_temp_label.setTextFormat(Qt.TextFormat.RichText)
+        self._cabin_temp_label.setContentsMargins(20, 4, 20, 4)
+        self._cabin_temp_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._cabin_temp_label.mousePressEvent = lambda _: self._open_cabin_temp()
+        cabin_temp_widget = QWidgetAction(menu)
+        cabin_temp_widget.setDefaultWidget(self._cabin_temp_label)
+        menu.addAction(cabin_temp_widget)
+
+        # 11. Set Precondition schedule
         precond_set_action = QAction("Set Precondition Schedule", menu)
         precond_set_action.triggered.connect(self._open_precond_set)
         menu.addAction(precond_set_action)
@@ -304,6 +316,21 @@ class TeslaBarTray:
         # Charge limit
         self._charge_limit_action.setText(f"Charge Limit: {vd.charge_limit}%")
 
+        # Cabin temperature
+        if vd.inside_temp is not None:
+            cabin_t = vd.inside_temp
+            if cabin_t < 20:
+                t_color = "blue"
+            elif cabin_t <= 25:
+                t_color = "orange"
+            else:
+                t_color = "red"
+            self._cabin_temp_label.setText(
+                f"Cabin Temperature: <span style='color:{t_color}'>{cabin_t:.1f}°C</span>"
+            )
+        else:
+            self._cabin_temp_label.setText("Cabin Temperature: --")
+
         # Climate
         climate_text = "Climate: On" if vd.climate_on else "Climate: Off"
         if vd.inside_temp is not None:
@@ -362,6 +389,16 @@ class TeslaBarTray:
 
     def _on_charge_limit_set(self, percent: int) -> None:
         asyncio.ensure_future(self._tesla.set_charge_limit(percent))
+
+    def _open_cabin_temp(self) -> None:
+        current = self._tesla.vehicle_data.inside_temp or 20.0
+        self._cabin_temp_popup = CabinTempPopup(current)
+        self._cabin_temp_popup.cabin_temp_changed.connect(self._on_cabin_temp_set)
+        self._cabin_temp_popup.show()
+        self._cabin_temp_popup.raise_()
+
+    def _on_cabin_temp_set(self, temp: float) -> None:
+        asyncio.ensure_future(self._tesla.set_cabin_temp(temp))
 
     def _on_climate_toggle(self) -> None:
         if self._tesla.vehicle_data.climate_on:

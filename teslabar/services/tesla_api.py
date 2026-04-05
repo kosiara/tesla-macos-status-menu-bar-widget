@@ -548,6 +548,9 @@ class TeslaService:
     async def preconditioning_off(self) -> bool:
         return await self._send_command("set_preconditioning_max", on=False, manual_override=True)
 
+    async def set_cabin_temp(self, temp_c: float) -> bool:
+        return await self._send_command("set_temps", driver_temp=temp_c, passenger_temp=temp_c)
+
     async def lock(self) -> bool:
         return await self._send_command("door_lock")
 
