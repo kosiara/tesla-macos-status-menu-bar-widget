@@ -11,6 +11,7 @@ from urllib.parse import quote
 import aiohttp
 from tesla_fleet_api.tesla.fleet import TeslaFleetApi
 from tesla_fleet_api.tesla.vehicle.fleet import VehicleFleet
+from tesla_fleet_api.exceptions import TeslaFleetError, VehicleOffline
 
 logger = logging.getLogger(__name__)
 
@@ -357,12 +358,20 @@ class TeslaService:
                         "vehicle_state",
                     ],
                 )
-            except Exception as e:
-                err_str = str(e).lower()
-                if "408" in err_str or "asleep" in err_str or "offline" in err_str:
-                    self.vehicle_data.state = VehicleState.ASLEEP
+            except VehicleOffline:
+                self.vehicle_data.state = VehicleState.ASLEEP
+                logger.info("Vehicle is asleep/offline, attempting wake...")
+                awake = await self._wake_if_needed()
+                if not awake:
                     return self.vehicle_data
-                raise
+                # Retry after wake
+                resp = await vehicle.vehicle_data(
+                    endpoints=[
+                        "charge_state",
+                        "climate_state",
+                        "vehicle_state",
+                    ],
+                )
 
             data = resp.get("response", {})
             state_str = data.get("state", "unknown")
@@ -395,7 +404,7 @@ class TeslaService:
 
         except RuntimeError:
             raise
-        except Exception as e:
+        except BaseException as e:
             logger.error("Fetch vehicle data error: %s", e)
             self.vehicle_data.state = VehicleState.ERROR
             self.vehicle_data.error_message = str(e)
@@ -422,7 +431,7 @@ class TeslaService:
 
             self._command_status = f"Success: {command}"
             return True
-        except Exception as e:
+        except BaseException as e:
             logger.error("Command %s failed: %s", command, e)
             self._command_status = f"Failed: {e}"
             self.vehicle_data.state = VehicleState.ERROR

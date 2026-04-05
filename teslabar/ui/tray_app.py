@@ -196,11 +196,17 @@ class TeslaBarTray:
     async def _do_refresh(self) -> None:
         try:
             await self._tesla.fetch_vehicle_data()
-        except Exception as e:
+        except BaseException as e:
             err_name = type(e).__name__.lower()
             err_msg = str(e).lower()
             if "expired" in err_name or "expired" in err_msg or "oauthexpired" in err_name:
                 self._tesla.vehicle_data.state = VehicleState.AUTH_EXPIRED
+            elif "vehicleoffline" in err_name or "not 'online'" in err_msg:
+                self._tesla.vehicle_data.state = VehicleState.ASLEEP
+                self._update_menu()
+                awake = await self._tesla._wake_if_needed()
+                if awake:
+                    await self._tesla.fetch_vehicle_data()
             else:
                 logger.error("Refresh error: %s", e)
                 self._tesla.vehicle_data.state = VehicleState.ERROR

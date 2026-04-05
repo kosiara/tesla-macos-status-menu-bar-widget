@@ -105,7 +105,20 @@ class MainWindow(QWidget):
         asyncio.ensure_future(self._do_refresh())
 
     async def _do_refresh(self) -> None:
-        await self._tesla.fetch_vehicle_data()
+        try:
+            await self._tesla.fetch_vehicle_data()
+        except BaseException as e:
+            err_name = type(e).__name__.lower()
+            err_msg = str(e).lower()
+            if "vehicleoffline" in err_name or "not 'online'" in err_msg:
+                self._tesla.vehicle_data.state = VehicleState.ASLEEP
+                self.update_display()
+                awake = await self._tesla._wake_if_needed()
+                if awake:
+                    await self._tesla.fetch_vehicle_data()
+            else:
+                self._tesla.vehicle_data.state = VehicleState.ERROR
+                self._tesla.vehicle_data.error_message = str(e)
         self.update_display()
 
     def update_display(self) -> None:
