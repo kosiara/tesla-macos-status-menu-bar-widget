@@ -97,7 +97,7 @@ class TeslaBarTray:
         self._battery_section = BatteryChargingSection(menu, self._tesla)
 
         # Section 3: Vehicle lock, Sentry
-        self._security_section = SecuritySection(menu)
+        self._security_section = SecuritySection(menu, self._tesla)
 
         # Section 4: Charge limit, Cabin temp, Temp limit, Precondition schedule, Climate
         self._switches_section = SwitchesSection(menu, self._tesla)
@@ -156,7 +156,7 @@ class TeslaBarTray:
 
         self._main_section.update(vd)
         self._battery_section.update(vd, enabled)
-        self._security_section.update(vd)
+        self._security_section.update(vd, enabled)
         self._switches_section.update(vd, enabled)
 
         # Update child windows if open

@@ -552,6 +552,9 @@ class TeslaService:
     async def preconditioning_off(self) -> bool:
         return await self._send_command("set_preconditioning_max", on=False, manual_override=True)
 
+    async def set_sentry_mode(self, on: bool) -> bool:
+        return await self._send_command("set_sentry_mode", on=on)
+
     async def set_charging_amps(self, amps: int) -> bool:
         return await self._send_command("set_charging_amps", charging_amps=amps)
 
