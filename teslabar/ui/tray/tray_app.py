@@ -6,7 +6,7 @@ import secrets
 import webbrowser
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QWidgetAction, QLabel
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import QTimer
 
@@ -74,6 +74,14 @@ class TeslaBarTray:
 
     def _build_menu(self) -> None:
         menu = QMenu()
+
+        # Invisible spacer to force menu width on macOS
+        spacer = QLabel()
+        spacer.setFixedWidth(210)
+        spacer.setFixedHeight(2)
+        spacer_action = QWidgetAction(menu)
+        spacer_action.setDefaultWidget(spacer)
+        menu.addAction(spacer_action)
 
         # Section 1: Status, Settings, Open in a Window
         self._main_section = MainSection(
