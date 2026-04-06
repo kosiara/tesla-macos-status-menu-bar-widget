@@ -7,10 +7,10 @@ from PySide6.QtGui import QAction, Qt
 
 from teslabar.config import load_config
 from teslabar.services.tesla_api import TeslaService, VehicleData
-from teslabar.ui.charge_limit_popup import ChargeLimitPopup
-from teslabar.ui.cabin_temp_popup import CabinTempPopup
-from teslabar.ui.tray_app_preheating import PreheatingSection
-from teslabar.ui.preconditioning_set_schedule_window import PreconditionSetWindow
+from teslabar.ui.popup.charge_limit_popup import ChargeLimitPopup
+from teslabar.ui.popup.cabin_temp_popup import CabinTempPopup
+from teslabar.ui.tray.tray_app_preheating import PreheatingSection
+from teslabar.ui.schedule.preconditioning_set_schedule_window import PreconditionSetWindow
 
 
 class SwitchesSection:

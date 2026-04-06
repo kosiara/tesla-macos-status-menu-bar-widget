@@ -8,10 +8,9 @@ import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
 
-from teslabar.crypto.credential_store import credentials_exist, load_credentials
 from teslabar.services.tesla_api import TeslaService
-from teslabar.ui.password_dialog import PasswordDialog
-from teslabar.ui.tray_app import TeslaBarTray
+from teslabar.ui.popup.password_dialog import PasswordDialog
+from teslabar.ui.tray.tray_app import TeslaBarTray
 
 logging.basicConfig(
     level=logging.INFO,

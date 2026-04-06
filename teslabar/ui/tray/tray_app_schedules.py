@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
 
 from teslabar.services.tesla_api import TeslaService
-from teslabar.ui.schedule_window import PreconditionListWindow, ChargingListWindow
+from teslabar.ui.schedule.schedule_window import PreconditionListWindow, ChargingListWindow
 
 
 class SchedulesSection:

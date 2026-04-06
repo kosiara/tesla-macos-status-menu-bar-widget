@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from teslabar.config import load_config
 from teslabar.services.tesla_api import TeslaService, VehicleState
-from teslabar.ui.main_window_location import LocationTab
+from teslabar.ui.mainwindow.main_window_location import LocationTab
 
 logger = logging.getLogger(__name__)
 

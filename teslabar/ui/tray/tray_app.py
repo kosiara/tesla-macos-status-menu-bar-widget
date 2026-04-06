@@ -18,18 +18,18 @@ from teslabar.services.oauth_server import (
     get_callback_result,
     get_local_redirect_uri,
 )
-from teslabar.ui.settings_window import SettingsWindow
-from teslabar.ui.status_window import StatusWindow
-from teslabar.ui.main_window import MainWindow
-from teslabar.ui.tray_app_main import MainSection
-from teslabar.ui.tray_app_battery_charging import BatteryChargingSection
-from teslabar.ui.tray_app_security import SecuritySection
-from teslabar.ui.tray_app_switches import SwitchesSection
-from teslabar.ui.tray_app_schedules import SchedulesSection
+from teslabar.ui.settings.settings_window import SettingsWindow
+from teslabar.ui.status.status_window import StatusWindow
+from teslabar.ui.mainwindow.main_window import MainWindow
+from teslabar.ui.tray.tray_app_main import MainSection
+from teslabar.ui.tray.tray_app_battery_charging import BatteryChargingSection
+from teslabar.ui.tray.tray_app_security import SecuritySection
+from teslabar.ui.tray.tray_app_switches import SwitchesSection
+from teslabar.ui.tray.tray_app_schedules import SchedulesSection
 
 logger = logging.getLogger(__name__)
 
-RESOURCES = Path(__file__).parent.parent.parent / "resources"
+RESOURCES = Path(__file__).parent.parent.parent.parent / "resources"
 
 
 class TeslaBarTray:
