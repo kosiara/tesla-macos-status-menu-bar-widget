@@ -56,6 +56,17 @@ class SwitchesSection:
         self._climate_action.triggered.connect(self._on_climate_toggle)
         menu.addAction(self._climate_action)
 
+        # Low Power Mode (rich text, clickable)
+        self._low_power_label = QLabel("Low power mode: --")
+        self._low_power_label.setTextFormat(Qt.TextFormat.RichText)
+        self._low_power_label.setContentsMargins(20, 4, 20, 4)
+        self._low_power_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._low_power_label.mousePressEvent = lambda _: self._on_low_power_toggle()
+        low_power_widget = QWidgetAction(menu)
+        low_power_widget.setDefaultWidget(self._low_power_label)
+        self._low_power_widget_action = low_power_widget
+        menu.addAction(low_power_widget)
+
         menu.addSeparator()
 
     def update(self, vd: VehicleData, enabled: bool) -> None:
@@ -103,6 +114,17 @@ class SwitchesSection:
             climate_text += f" ({temp:.1f}°{unit})"
         self._climate_action.setText(climate_text)
 
+        # Low Power Mode
+        self._low_power_widget_action.setEnabled(enabled)
+        if vd.low_power_mode:
+            self._low_power_label.setText(
+                "Low power mode: <span style='color:red; font-weight:bold;'>ON</span>"
+            )
+        else:
+            self._low_power_label.setText(
+                "Low power mode: <span style='color:green; font-weight:bold;'>OFF</span>"
+            )
+
     def _open_charge_limit(self) -> None:
         current = self._tesla.vehicle_data.charge_limit
         self._charge_limit_popup = ChargeLimitPopup(current)
@@ -128,6 +150,12 @@ class SwitchesSection:
             asyncio.ensure_future(self._tesla.climate_off())
         else:
             asyncio.ensure_future(self._tesla.climate_on())
+
+    def _on_low_power_toggle(self) -> None:
+        if not self._low_power_widget_action.isEnabled():
+            return
+        new_state = not self._tesla.vehicle_data.low_power_mode
+        asyncio.ensure_future(self._tesla.set_low_power_mode(new_state))
 
     def _open_precond_set(self) -> None:
         self._precond_set_win = PreconditionSetWindow(self._tesla)

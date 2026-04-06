@@ -44,6 +44,7 @@ class VehicleData:
     inside_temp: float | None = None
     outside_temp: float | None = None
     driver_temp_setting: float | None = None
+    low_power_mode: bool = False
     latitude: float | None = None
     longitude: float | None = None
     error_message: str = ""
@@ -432,15 +433,15 @@ class TeslaService:
         try:
             vehicle = await self._ensure_vehicle()
 
+            endpoints = [
+                "charge_state",
+                "climate_state",
+                "vehicle_state",
+                "vehicle_config",
+                "drive_state",
+            ]
             try:
-                resp = await vehicle.vehicle_data(
-                    endpoints=[
-                        "charge_state",
-                        "climate_state",
-                        "vehicle_state",
-                        "drive_state",
-                    ],
-                )
+                resp = await vehicle.vehicle_data(endpoints=endpoints)
             except VehicleOffline:
                 self.vehicle_data.state = VehicleState.ASLEEP
                 logger.info("Vehicle is asleep/offline, attempting wake...")
@@ -448,14 +449,7 @@ class TeslaService:
                 if not awake:
                     return self.vehicle_data
                 # Retry after wake
-                resp = await vehicle.vehicle_data(
-                    endpoints=[
-                        "charge_state",
-                        "climate_state",
-                        "vehicle_state",
-                        "drive_state",
-                    ],
-                )
+                resp = await vehicle.vehicle_data(endpoints=endpoints)
 
             data = resp.get("response", {})
             state_str = data.get("state", "unknown")
@@ -472,6 +466,7 @@ class TeslaService:
             charge = data.get("charge_state", {})
             climate = data.get("climate_state", {})
             vstate = data.get("vehicle_state", {})
+            vconfig = data.get("vehicle_config", {})
             drive = data.get("drive_state", {})
 
             self.vehicle_data = VehicleData(
@@ -483,6 +478,7 @@ class TeslaService:
                 sentry_mode=vstate.get("sentry_mode", False),
                 climate_on=climate.get("is_climate_on", False),
                 is_preconditioning=climate.get("is_preconditioning", False),
+                low_power_mode=vconfig.get("low_power_mode", False),
                 driver_temp_setting=climate.get("driver_temp_setting"),
                 inside_temp=climate.get("inside_temp"),
                 outside_temp=climate.get("outside_temp"),
@@ -552,6 +548,25 @@ class TeslaService:
 
     async def set_cabin_temp(self, temp_c: float) -> bool:
         return await self._send_command("set_temps", driver_temp=temp_c, passenger_temp=temp_c)
+
+    async def set_low_power_mode(self, enabled: bool) -> bool:
+        """Toggle low power mode via REST API (not available in signed commands)."""
+        try:
+            await self._ensure_api()
+            if not self._vin:
+                return False
+            if not await self._wake_if_needed():
+                return False
+            cmd = "enable_low_power_mode" if enabled else "disable_low_power_mode"
+            resp = await self._api._request(
+                Method.POST,
+                f"api/1/vehicles/{self._vin}/command/{cmd}",
+            )
+            logger.info("%s response: %s", cmd, resp)
+            return True
+        except BaseException as e:
+            logger.error("set_low_power_mode failed: %s", e)
+            return False
 
     async def lock(self) -> bool:
         return await self._send_command("door_lock")
