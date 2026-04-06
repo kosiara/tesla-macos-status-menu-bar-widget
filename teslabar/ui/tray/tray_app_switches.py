@@ -26,10 +26,16 @@ class SwitchesSection:
         self._preheating = PreheatingSection(menu, tesla_service)
         # menu.addAction(self._preheating.widget_action)
 
-        # Charge limit
-        self._charge_limit_action = QAction("Charge Limit: --%", menu)
-        self._charge_limit_action.triggered.connect(self._open_charge_limit)
-        menu.addAction(self._charge_limit_action)
+        # Charge limit (rich text, clickable)
+        self._charge_limit_label = QLabel("Charge Limit: --%")
+        self._charge_limit_label.setTextFormat(Qt.TextFormat.RichText)
+        self._charge_limit_label.setContentsMargins(20, 4, 20, 4)
+        self._charge_limit_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._charge_limit_label.mousePressEvent = lambda _: self._open_charge_limit()
+        charge_limit_widget = QWidgetAction(menu)
+        charge_limit_widget.setDefaultWidget(self._charge_limit_label)
+        self._charge_limit_widget_action = charge_limit_widget
+        menu.addAction(charge_limit_widget)
 
         # Cabin temperature (rich text, clickable)
         self._cabin_temp_label = QLabel("Cabin Temperature: --")
@@ -73,14 +79,23 @@ class SwitchesSection:
         cfg = load_config()
         unit = cfg.get("temperature_unit", "C")
 
-        self._charge_limit_action.setEnabled(enabled)
+        self._charge_limit_widget_action.setEnabled(enabled)
         self._climate_action.setEnabled(enabled)
 
         # Preheating
         self._preheating.update(vd.is_preconditioning, enabled)
 
         # Charge limit
-        self._charge_limit_action.setText(f"Charge Limit: {vd.charge_limit}%")
+        cl = vd.charge_limit
+        if cl <= 80:
+            cl_color = "green"
+        elif cl <= 95:
+            cl_color = "orange"
+        else:
+            cl_color = "red"
+        self._charge_limit_label.setText(
+            f"Charge Limit: <span style='color:{cl_color}; font-weight:bold;'>{cl}%</span>"
+        )
 
         # Cabin temperature
         if vd.inside_temp is not None:
