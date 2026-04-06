@@ -8,7 +8,7 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(SPECPATH))
+PROJECT_ROOT = os.environ.get("TESLABAR_PROJECT_ROOT", os.path.abspath(os.path.dirname(SPECPATH)))
 
 # Collect all teslabar submodules
 teslabar_hiddenimports = collect_submodules("teslabar")
@@ -98,7 +98,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="TeslaBar.app",
-    icon=os.path.join(PROJECT_ROOT, "resources", "tesla_icon.png"),
+    icon=os.path.join(PROJECT_ROOT, "resources", "tesla_icon.icns"),
     bundle_identifier="com.teslabar.app",
     info_plist={
         "CFBundleName": "TeslaBar",

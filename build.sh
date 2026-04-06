@@ -15,7 +15,11 @@ echo "[1/5] Checking dependencies..."
 
 if ! command -v pyinstaller &>/dev/null; then
     echo "  PyInstaller not found. Installing..."
-    pip install pyinstaller
+    if ! command -v pipx &>/dev/null; then
+        brew install pipx
+        pipx ensurepath
+    fi
+    pipx install pyinstaller
 fi
 
 if ! command -v create-dmg &>/dev/null; then
@@ -51,7 +55,8 @@ fi
 
 # ── 4. Run PyInstaller ──────────────────────────────────────────
 echo "[4/5] Building app with PyInstaller..."
-pyinstaller \
+cd "$SCRIPT_DIR"
+TESLABAR_PROJECT_ROOT="$SCRIPT_DIR" pyinstaller \
     --noconfirm \
     --clean \
     --distpath "$DIST_DIR" \
