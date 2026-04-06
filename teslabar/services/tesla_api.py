@@ -552,6 +552,13 @@ class TeslaService:
     async def preconditioning_off(self) -> bool:
         return await self._send_command("set_preconditioning_max", on=False, manual_override=True)
 
+    async def vent_windows(self) -> bool:
+        return await self._send_command("window_control", **{"command": "vent"})
+
+    async def close_windows(self) -> bool:
+        lat, lon = await self._get_location()
+        return await self._send_command("window_control", **{"command": "close", "lat": lat, "lon": lon})
+
     async def set_sentry_mode(self, on: bool) -> bool:
         return await self._send_command("set_sentry_mode", on=on)
 
