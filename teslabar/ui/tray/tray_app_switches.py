@@ -130,12 +130,15 @@ class SwitchesSection:
         else:
             v_color = "red"
 
-        if phases and phases >= 3:
+        # Tesla API returns 2 for 3-phase, 1 for 1-phase
+        actual_phases = {1: 1, 2: 3}.get(phases, None) if phases else None
+
+        if actual_phases == 3:
             p_color = "green"
         else:
             p_color = "red"
 
-        phases_str = f"{phases}f" if phases else "--f"
+        phases_str = f"{actual_phases}f" if actual_phases else "--f"
         self._charge_rate_label.setText(
             f"Charge rate: "
             f"<span style='color:{a_color}; font-weight:bold;'>{amps}A</span> / "
