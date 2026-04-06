@@ -56,6 +56,13 @@ fi
 # ── 4. Run PyInstaller ──────────────────────────────────────────
 echo "[4/5] Building app with PyInstaller..."
 cd "$SCRIPT_DIR"
+
+# Activate project venv so PyInstaller can find all dependencies
+if [ -f "$SCRIPT_DIR/.venv/bin/activate" ]; then
+    echo "  Activating project venv..."
+    source "$SCRIPT_DIR/.venv/bin/activate"
+fi
+
 TESLABAR_PROJECT_ROOT="$SCRIPT_DIR" pyinstaller \
     --noconfirm \
     --clean \

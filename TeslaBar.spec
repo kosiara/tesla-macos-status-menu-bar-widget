@@ -48,7 +48,10 @@ hidden_imports = [
 
 a = Analysis(
     [os.path.join(PROJECT_ROOT, "teslabar", "__main__.py")],
-    pathex=[PROJECT_ROOT],
+    pathex=[
+        PROJECT_ROOT,
+        os.path.join(PROJECT_ROOT, ".venv", "lib", "python3.14", "site-packages"),
+    ],
     binaries=[],
     datas=[
         (os.path.join(PROJECT_ROOT, "resources"), "resources"),
