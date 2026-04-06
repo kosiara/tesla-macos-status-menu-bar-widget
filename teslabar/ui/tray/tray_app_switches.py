@@ -115,9 +115,32 @@ class SwitchesSection:
         amps = vd.charger_actual_current
         phases = vd.charger_phases
         voltage = vd.charger_voltage
+
+        if amps >= 16:
+            a_color = "green"
+        elif amps >= 12:
+            a_color = "orange"
+        else:
+            a_color = "red"
+
+        if voltage >= 220:
+            v_color = "green"
+        elif voltage >= 210:
+            v_color = "orange"
+        else:
+            v_color = "red"
+
+        if phases and phases >= 3:
+            p_color = "green"
+        else:
+            p_color = "red"
+
         phases_str = f"{phases}f" if phases else "--f"
         self._charge_rate_label.setText(
-            f"Charge rate: {amps}A / {phases_str} / {voltage}V"
+            f"Charge rate: "
+            f"<span style='color:{a_color}; font-weight:bold;'>{amps}A</span> / "
+            f"<span style='color:{p_color}; font-weight:bold;'>{phases_str}</span> / "
+            f"<span style='color:{v_color}; font-weight:bold;'>{voltage}V</span>"
         )
 
         # Cabin temperature
