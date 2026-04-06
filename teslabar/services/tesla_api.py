@@ -37,6 +37,9 @@ class VehicleData:
     battery_level: int = 0
     charge_limit: int = 80
     charging_state: str = "Disconnected"
+    charger_actual_current: int = 0
+    charger_voltage: int = 0
+    charger_phases: int | None = None
     is_locked: bool = True
     sentry_mode: bool = False
     climate_on: bool = False
@@ -474,6 +477,9 @@ class TeslaService:
                 battery_level=charge.get("battery_level", 0),
                 charge_limit=charge.get("charge_limit_soc", 80),
                 charging_state=charge.get("charging_state", "Disconnected"),
+                charger_actual_current=charge.get("charger_actual_current", 0),
+                charger_voltage=charge.get("charger_voltage", 0),
+                charger_phases=charge.get("charger_phases"),
                 is_locked=vstate.get("locked", True),
                 sentry_mode=vstate.get("sentry_mode", False),
                 climate_on=climate.get("is_climate_on", False),
@@ -545,6 +551,9 @@ class TeslaService:
 
     async def preconditioning_off(self) -> bool:
         return await self._send_command("set_preconditioning_max", on=False, manual_override=True)
+
+    async def set_charging_amps(self, amps: int) -> bool:
+        return await self._send_command("set_charging_amps", charging_amps=amps)
 
     async def set_cabin_temp(self, temp_c: float) -> bool:
         return await self._send_command("set_temps", driver_temp=temp_c, passenger_temp=temp_c)

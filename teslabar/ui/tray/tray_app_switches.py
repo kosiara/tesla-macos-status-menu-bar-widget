@@ -9,6 +9,7 @@ from teslabar.config import load_config
 from teslabar.services.tesla_api import TeslaService, VehicleData
 from teslabar.ui.popup.charge_limit_popup import ChargeLimitPopup
 from teslabar.ui.popup.cabin_temp_popup import CabinTempPopup
+from teslabar.ui.popup.charging_amps_popup import ChargingAmpsPopup
 from teslabar.ui.tray.tray_app_preheating import PreheatingSection
 from teslabar.ui.schedule.preconditioning_set_schedule_window import PreconditionSetWindow
 
@@ -19,6 +20,7 @@ class SwitchesSection:
     def __init__(self, menu: QMenu, tesla_service: TeslaService) -> None:
         self._tesla = tesla_service
         self._charge_limit_popup: ChargeLimitPopup | None = None
+        self._charging_amps_popup: ChargingAmpsPopup | None = None
         self._cabin_temp_popup: CabinTempPopup | None = None
         self._precond_set_win: PreconditionSetWindow | None = None
 
@@ -36,6 +38,17 @@ class SwitchesSection:
         charge_limit_widget.setDefaultWidget(self._charge_limit_label)
         self._charge_limit_widget_action = charge_limit_widget
         menu.addAction(charge_limit_widget)
+
+        # Charge rate (rich text, clickable)
+        self._charge_rate_label = QLabel("Charge rate: --")
+        self._charge_rate_label.setTextFormat(Qt.TextFormat.RichText)
+        self._charge_rate_label.setContentsMargins(20, 4, 20, 4)
+        self._charge_rate_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._charge_rate_label.mousePressEvent = lambda _: self._open_charging_amps()
+        charge_rate_widget = QWidgetAction(menu)
+        charge_rate_widget.setDefaultWidget(self._charge_rate_label)
+        self._charge_rate_widget_action = charge_rate_widget
+        menu.addAction(charge_rate_widget)
 
         # Cabin temperature (rich text, clickable)
         self._cabin_temp_label = QLabel("Cabin Temperature: --")
@@ -80,6 +93,7 @@ class SwitchesSection:
         unit = cfg.get("temperature_unit", "C")
 
         self._charge_limit_widget_action.setEnabled(enabled)
+        self._charge_rate_widget_action.setEnabled(enabled)
         self._climate_action.setEnabled(enabled)
 
         # Preheating
@@ -95,6 +109,15 @@ class SwitchesSection:
             cl_color = "red"
         self._charge_limit_label.setText(
             f"Charge Limit: <span style='color:{cl_color}; font-weight:bold;'>{cl}%</span>"
+        )
+
+        # Charge rate
+        amps = vd.charger_actual_current
+        phases = vd.charger_phases
+        voltage = vd.charger_voltage
+        phases_str = f"{phases}f" if phases else "--f"
+        self._charge_rate_label.setText(
+            f"Charge rate: {amps}A / {phases_str} / {voltage}V"
         )
 
         # Cabin temperature
@@ -149,6 +172,18 @@ class SwitchesSection:
 
     def _on_charge_limit_set(self, percent: int) -> None:
         asyncio.ensure_future(self._tesla.set_charge_limit(percent))
+
+    def _open_charging_amps(self) -> None:
+        if not self._charge_rate_widget_action.isEnabled():
+            return
+        current = self._tesla.vehicle_data.charger_actual_current or 16
+        self._charging_amps_popup = ChargingAmpsPopup(current)
+        self._charging_amps_popup.charging_amps_changed.connect(self._on_charging_amps_set)
+        self._charging_amps_popup.show()
+        self._charging_amps_popup.raise_()
+
+    def _on_charging_amps_set(self, amps: int) -> None:
+        asyncio.ensure_future(self._tesla.set_charging_amps(amps))
 
     def _open_cabin_temp(self) -> None:
         current = self._tesla.vehicle_data.driver_temp_setting or 20.0
