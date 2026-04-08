@@ -116,6 +116,21 @@ Tesla Fleet API requires a third-party virtual key to be installed on your vehic
 
 After the key is installed, TeslaBar can send commands (start/stop charge, climate, etc.) to your vehicle.
 
+## Install on MacOS 
+Download the newest release (instead of compiling from source). 
+The *.dmg is NOT signed so you can install going though a couple of security popups or you could try the following: 
+
+#### Disable Gatekeeper System-Wide
+`sudo spctl --master-disable`
+
+#### Skip DMG Verification 
+```bash
+defaults write com.apple.frameworks.diskimages skip-verify -bool true
+defaults write com.apple.frameworks.diskimages skip-verify-locked -bool true
+defaults write com.apple.frameworks.diskimages skip-verify-remote -bool true
+```
+### To recursively remove Quarantine from an entire app bundle or directory:
+`xattr -r -d com.apple.quarantine /path/to/app.app`
 
 <h2>Host your public key on GitHub Pages (click to expand)</h2>
 <details>
