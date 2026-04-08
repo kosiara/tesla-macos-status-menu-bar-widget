@@ -2,6 +2,10 @@
 
 A macOS (and Windows) menu bar app for controlling your Tesla vehicle via the Tesla Fleet API. Built with Python 3.14 and PySide6.
 
+# Tesla Widget
+
+![Tesla Widget MacOS](resources/screenshots/widget.png)
+
 ## Project Structure
 
 ```
@@ -131,6 +135,17 @@ defaults write com.apple.frameworks.diskimages skip-verify-remote -bool true
 ```
 ### To recursively remove Quarantine from an entire app bundle or directory:
 `xattr -r -d com.apple.quarantine /path/to/app.app`
+
+### popups - access keychain
+
+![USB Drive DMG installer](resources/screenshots/widget_installer.png)
+
+![Keychain Permissions](resources/screenshots/keychain_permissions.png)
+
+## When doing OAuth - remember to give Tesla permission to get the car's location if you wish to use locaation in the app (optional)
+
+![Oauth — enable location permission](resources/screenshots/location_permission_oauth.png)
+
 
 <h2>Host your public key on GitHub Pages (click to expand)</h2>
 <details>
