@@ -6,6 +6,8 @@ A macOS (and Windows) menu bar app for controlling your Tesla vehicle via the Te
 
 ![Tesla Widget MacOS](resources/screenshots/widget.png)
 
+![Tesla Widget Running MacOS](resources/screenshots/tesla_widget_running.gif)
+
 ## Project Structure
 
 ```
